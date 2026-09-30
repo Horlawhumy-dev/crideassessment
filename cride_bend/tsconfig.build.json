@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // rootDir must be pinned, not inferred. Inheriting tsconfig.json's include left
+    // the build emitting dist/src/main.js and dist/prisma/*, because two top-level
+    // roots (src and prisma) made the project directory their common ancestor.
+    // package.json points `main` and `start` at dist/main, so the build was
+    // producing output the start script could not load.
+    "rootDir": "./src",
+    "outDir": "./dist",
+
+    // Must be off for the build. nest-cli.json sets deleteOutDir: true, and an
+    // incremental build whose outDir was just deleted concludes there is nothing
+    // to do: it rewrites the .tsbuildinfo, emits zero files, and exits 0. That is
+    // a silent no-op build, which is far worse than a failure because `npm start`
+    // then fails on a missing module instead of on a failed compile.
+    "incremental": false,
+    "tsBuildInfoFile": null
+  },
+
+  // src only. prisma/seed.ts is executed by tsx from source (npm run db:seed) and
+  // prisma/migrations is read by the Prisma CLI, so neither belongs in the runtime
+  // build. Including them is what forced the nested dist layout above.
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
+}

@@ -1,0 +1,274 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/* ---------------------------------------------------------------------------
+ * Design tokens.
+ *
+ * Feature code may not use arbitrary values. Colours come from these tokens
+ * (or from a component/ui primitive), never from a literal — see
+ * scripts/check-no-arbitrary-colors.mjs, which fails the build if it does.
+ * ------------------------------------------------------------------------- */
+@theme inline {
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+
+  /* Semantic tones. These are the ONLY vocabulary StatusBadge is allowed to
+     use, so a ride status never becomes an ad-hoc colour in a feature file. */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-soft: var(--warning-soft);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-soft: var(--info-soft);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  color-scheme: light;
+
+  --background: oklch(0.985 0.004 200);
+  --foreground: oklch(0.16 0.02 220);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.16 0.02 220);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.16 0.02 220);
+
+  /* C-Ride brand: a deep teal-green. */
+  --primary: oklch(0.52 0.115 180);
+  --primary-foreground: oklch(0.99 0.005 180);
+
+  --secondary: oklch(0.96 0.008 195);
+  --secondary-foreground: oklch(0.28 0.04 195);
+  --muted: oklch(0.965 0.005 210);
+  --muted-foreground: oklch(0.52 0.017 220);
+  --accent: oklch(0.955 0.017 180);
+  --accent-foreground: oklch(0.34 0.07 180);
+
+  --destructive: oklch(0.58 0.215 27);
+  --border: oklch(0.915 0.008 210);
+  --input: oklch(0.915 0.008 210);
+  --ring: oklch(0.52 0.115 180);
+
+  --success: oklch(0.55 0.13 152);
+  --success-foreground: oklch(0.99 0.005 152);
+  --success-soft: oklch(0.955 0.03 152);
+  --warning: oklch(0.68 0.15 68);
+  --warning-foreground: oklch(0.99 0.005 68);
+  --warning-soft: oklch(0.96 0.045 78);
+  --info: oklch(0.56 0.13 240);
+  --info-foreground: oklch(0.99 0.005 240);
+  --info-soft: oklch(0.955 0.028 240);
+
+  --chart-1: oklch(0.52 0.115 180);
+  --chart-2: oklch(0.62 0.13 200);
+  --chart-3: oklch(0.7 0.12 160);
+  --chart-4: oklch(0.78 0.11 90);
+  --chart-5: oklch(0.45 0.09 220);
+
+  --radius: 0.75rem;
+
+  --sidebar: oklch(0.985 0.004 200);
+  --sidebar-foreground: oklch(0.16 0.02 220);
+  --sidebar-primary: oklch(0.52 0.115 180);
+  --sidebar-primary-foreground: oklch(0.99 0.005 180);
+  --sidebar-accent: oklch(0.955 0.017 180);
+  --sidebar-accent-foreground: oklch(0.34 0.07 180);
+  --sidebar-border: oklch(0.915 0.008 210);
+  --sidebar-ring: oklch(0.52 0.115 180);
+
+  /* Map surface. Kept as tokens so MapPlaceholder is not a bag of hex. */
+  --map-land: oklch(0.93 0.012 165);
+  --map-water: oklch(0.9 0.035 220);
+  --map-road: oklch(1 0 0);
+  --map-grid: oklch(0.87 0.01 190);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: oklch(0.16 0.018 220);
+  --foreground: oklch(0.97 0.004 200);
+
+  --card: oklch(0.21 0.02 220);
+  --card-foreground: oklch(0.97 0.004 200);
+  --popover: oklch(0.21 0.02 220);
+  --popover-foreground: oklch(0.97 0.004 200);
+
+  --primary: oklch(0.72 0.13 180);
+  --primary-foreground: oklch(0.16 0.03 185);
+  --secondary: oklch(0.27 0.02 220);
+  --secondary-foreground: oklch(0.96 0.006 200);
+  --muted: oklch(0.26 0.018 220);
+  --muted-foreground: oklch(0.72 0.015 210);
+  --accent: oklch(0.3 0.035 185);
+  --accent-foreground: oklch(0.93 0.03 180);
+
+  --destructive: oklch(0.68 0.19 25);
+  --border: oklch(1 0 0 / 11%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.72 0.13 180);
+
+  --success: oklch(0.72 0.14 152);
+  --success-foreground: oklch(0.16 0.03 152);
+  --success-soft: oklch(0.29 0.05 152);
+  --warning: oklch(0.8 0.14 72);
+  --warning-foreground: oklch(0.18 0.04 72);
+  --warning-soft: oklch(0.31 0.06 72);
+  --info: oklch(0.72 0.12 240);
+  --info-foreground: oklch(0.16 0.03 240);
+  --info-soft: oklch(0.3 0.06 240);
+
+  --chart-1: oklch(0.72 0.13 180);
+  --chart-2: oklch(0.66 0.12 200);
+  --chart-3: oklch(0.74 0.12 160);
+  --chart-4: oklch(0.8 0.11 90);
+  --chart-5: oklch(0.6 0.09 220);
+
+  --sidebar: oklch(0.19 0.02 220);
+  --sidebar-foreground: oklch(0.97 0.004 200);
+  --sidebar-primary: oklch(0.72 0.13 180);
+  --sidebar-primary-foreground: oklch(0.16 0.03 185);
+  --sidebar-accent: oklch(0.3 0.035 185);
+  --sidebar-accent-foreground: oklch(0.93 0.03 180);
+  --sidebar-border: oklch(1 0 0 / 11%);
+  --sidebar-ring: oklch(0.72 0.13 180);
+
+  --map-land: oklch(0.24 0.015 200);
+  --map-water: oklch(0.26 0.04 230);
+  --map-road: oklch(0.32 0.01 210);
+  --map-grid: oklch(0.3 0.012 210);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* A phone is a first-class target: the driver interface is used one-handed,
+     and the OS flash on every tap is distracting on a screen you are reading a
+     moving marker from. The utility is `tap-highlight-none`; the earlier
+     `tap-highlight-transparent` is not a Tailwind class at all and the build
+     refused it. */
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer utilities {
+  /* Respect the platform setting instead of assuming a pointer. */
+  @media (pointer: coarse) {
+    .touch-target {
+      min-height: 2.75rem;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Map markers.
+ *
+ * MapLibre's imperative API needs colour values at runtime, where a Tailwind
+ * class does not exist, so the map's DOM markers are styled here instead. That is
+ * why lib/map/maplibre-view.tsx is the one feature-adjacent file exempt from
+ * check-no-arbitrary-colors.mjs — the constraint is not "no colours", it is "no
+ * colours that are not tokens", and these read the tokens.
+ * ------------------------------------------------------------------------ */
+.map-marker {
+  --marker-heading: 0deg;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.map-marker__glyph {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 9999px;
+  box-shadow:
+    0 1px 2px oklch(0 0 0 / 0.18),
+    0 0 0 2px var(--background);
+}
+
+.map-marker__label {
+  border-radius: 0.375rem;
+  background: color-mix(in oklch, var(--card) 92%, transparent);
+  border: 1px solid var(--border);
+  padding: 0.2rem 0.35rem;
+  backdrop-filter: blur(4px);
+}
+
+.map-marker-pickup .map-marker__glyph {
+  background: var(--success);
+  color: var(--success-foreground);
+}
+
+.map-marker-dropoff .map-marker__glyph {
+  background: var(--destructive);
+  color: var(--destructive-foreground, #fff);
+}
+
+.map-marker-driver .map-marker__glyph {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  /* The heading, rotated. A triangle is the one glyph that has an orientation. */
+  transform: rotate(var(--marker-heading));
+  transform-origin: center;
+}
+
+.map-marker-user .map-marker__glyph {
+  background: var(--info);
+  color: var(--info-foreground);
+  width: 1.25rem;
+  height: 1.25rem;
+}

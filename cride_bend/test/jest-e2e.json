@@ -1,0 +1,45 @@
+{
+  // E2E Jest configuration.
+  //
+  // Separate from jest.config.js on purpose (§4.18): the unit suite has to stay
+  // fast enough to run on every save, and a suite that boots Postgres, Redis and
+  // a Nest application cannot be. `npm test` is the former, `npm run test:e2e` the
+  // latter, and `npm run verify` runs both.
+  //
+  // --runInBand is in the npm script rather than here so it can still be overridden
+  // for a shard. The concurrency inside a file is deliberate and already parallel
+  // (the accept-race fires 20 simultaneous requests), so running files in parallel
+  // buys little and makes shared-database interference more likely.
+  //
+  // ts-jest, not the tsx/esbuild pipeline used by worker:dev: esbuild does not
+  // implement emitDecoratorMetadata, so every @Injectable() class compiled that
+  // way loses its design:paramtypes and Nest cannot resolve its constructor. That
+  // is the difference between a bootable app and UndefinedDependencyException on
+  // every provider.
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": "..",
+  "testEnvironment": "node",
+  "testRegex": "test/e2e/.*\\.spec\\.ts$",
+  "transform": {
+    "^.+\\.ts$": ["ts-jest", { "tsconfig": "test/tsconfig.e2e.json" }]
+  },
+
+  // Real connections and real rows; the default 5s is not enough headroom for a
+  // 20-way race plus 20 bcrypt registrations.
+  "testTimeout": 60000,
+
+  // Before the test file's imports, not after. ConfigModule.forRoot() is invoked
+  // by the @Module decorator, which runs when app.module.ts is first imported.
+  // Anything that set process.env in setupFilesAfterEnv would be too late, because
+  // the configuration object is already frozen by then.
+  "setupFiles": ["<rootDir>/test/fixtures/env-e2e.ts"],
+
+  "clearMocks": true,
+  "restoreMocks": true,
+
+  // A leaked handle here is a hanging CI job. forceExit is deliberate: BullMQ
+  // workers and ioredis subscribers do not always close on app.close(), and
+  // hanging is worse than a fast exit.
+  "detectOpenHandles": false,
+  "forceExit": true
+}

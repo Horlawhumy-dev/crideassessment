@@ -1,0 +1,400 @@
+// §4.5 — the authoritative store.
+//
+// Three decisions are visible in this file and are worth stating, because each
+// one is a place where the obvious default is wrong:
+//
+//  D5  Money is BigInt minor units, not Decimal. Decimal maps to a Decimal.js
+//      instance that serialises to JSON as a string and invites float arithmetic
+//      somewhere downstream. 3450 minor units is unambiguous.
+//  D6  Coordinates are plain Decimal columns, not PostGIS geography. Nothing in
+//      the product geocodes or does spatial queries; the nearest-driver work that
+//      would justify PostGIS is explicitly deferred (§9.1). The cost of the
+//      simpler shape is one migration if that changes.
+//  D8  RideEvent carries a per-ride monotonic `seq` with a unique constraint.
+//      This is what makes §4.8.3 resync provable rather than hopeful: a client
+//      can detect a gap in the stream, and the relay can prove ordering.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  RIDER
+  DRIVER
+}
+
+/// Five states, matching the frontend product decision: ARRIVED was removed
+/// because it existed only to enable a UI step the product does not need.
+enum RideStatus {
+  REQUESTED
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum RideActor {
+  RIDER
+  DRIVER
+  SYSTEM
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  PUBLISHED
+  DEAD
+}
+
+enum NotificationStatus {
+  SENT
+  FAILED
+}
+
+/// The same five ride events `NotificationKind` names on the TypeScript side.
+/// It is repeated here because Prisma enums are declared in schema.prisma and
+/// cannot be derived from a type; `in-app.repository.ts` carries a compile-time
+/// assertion that the two stay the same set, so the duplication cannot rot.
+enum InAppNotificationKind {
+  RIDE_REQUESTED
+  RIDE_ACCEPTED
+  RIDE_IN_PROGRESS
+  RIDE_COMPLETED
+  RIDE_CANCELLED
+}
+
+// ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String
+  phone        String?
+  role         UserRole
+  /// Driver availability. A rider's value is meaningless and is left false.
+  isAvailable  Boolean  @default(false)
+  /// Kept as a denormalised copy of the current FCM token. DeviceToken is the
+  /// source of truth for multi-device; this exists so the common single-device
+  /// push is one indexed read instead of a join on the request path.
+  fcmToken     String?
+  lastSeenAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ridesAsRider    Ride[]        @relation("RiderRides")
+  ridesAsDriver   Ride[]        @relation("DriverRides")
+  events          RideEvent[]
+  devices         DeviceToken[]
+  refreshTokens   RefreshToken[]
+  notifications   NotificationDelivery[]
+  inbox           InAppNotification[]
+
+  @@index([role, isAvailable])
+  @@map("users")
+}
+
+model DeviceToken {
+  id        String    @id @default(uuid())
+  userId    String
+  token     String    @unique
+  platform  String
+  /// Set when FCM reports the install is gone (§4.14.2). Retaining the row with
+  /// revokedAt set is what makes "this device is dead" a fact rather than a
+  /// permanent poison pill in the push queue.
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@map("device_tokens")
+}
+
+/// §4.12.1 — refresh tokens are stored hashed and organised into families.
+///
+/// The family is the important part: rotating a token and detecting replay of the
+/// previous one is how a stolen token is caught. A plain single-use token only
+/// gives you the theft, not the signal.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  familyId  String
+  /// SHA-256 of the token. A database read must not yield a usable credential.
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([familyId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Ride aggregate
+// ---------------------------------------------------------------------------
+
+model Ride {
+  id       String     @id @default(uuid())
+  riderId  String
+  driverId String?
+  status   RideStatus @default(REQUESTED)
+
+  /// §4.5.2c — optimistic concurrency token. Incremented by the transition
+  /// repository on every state change; the WHERE clause on the update is what
+  /// turns a concurrent write into a 409 instead of a lost update.
+  version Int @default(1)
+
+  pickupLat     Decimal
+  pickupLng     Decimal
+  dropoffLat    Decimal
+  dropoffLng    Decimal
+  pickupAddress String?
+  dropoffAddress String?
+
+  /// D5: 3450 == 34.50. Null only for a ride that somehow has no estimate yet.
+  fareMinor  BigInt?
+  currency   String   @default("USD")
+
+  cancelledBy  RideActor?
+  cancelReason String?
+
+  acceptedAt  DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rider  User  @relation("RiderRides", fields: [riderId], references: [id])
+  driver User? @relation("DriverRides", fields: [driverId], references: [id])
+
+  events            RideEvent[]
+  outbox            OutboxMessage[]
+  idempotencyKeys   IdempotencyKey[]
+  routePoints       RoutePoint[]
+  notifications     NotificationDelivery[]
+  inbox             InAppNotification[]
+
+  // Partial-uniqueness is not expressible in Prisma, so it is enforced by a raw
+  // index in migration 0002. It is the database-level guarantee behind
+  // "a rider has at most one active ride" and it is what makes two concurrent
+  // requestRide calls impossible to both succeed, regardless of application code.
+  @@index([riderId, createdAt(sort: Desc)])
+  @@index([driverId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([riderId, status])
+  @@index([driverId, status])
+  @@map("rides")
+}
+
+/// §4.5.4 — the audit trail, and the reason the frontend can resync.
+///
+/// `seq` is per-ride and gapless. A client tracks the highest seq it has applied;
+/// if an arriving event's seq is not lastSeq + 1 the client knows it missed
+/// something and asks for a snapshot. Without this, a dropped socket frame
+/// silently produces a ride card stuck on "Accepted" forever.
+model RideEvent {
+  id        String    @id @default(uuid())
+  rideId    String
+  seq       Int
+  eventType String
+  actorId   String?
+  actorRole RideActor?
+  payload   Json
+  createdAt DateTime  @default(now())
+
+  ride  Ride  @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  /// The uniqueness that makes seq trustworthy: two events cannot claim the same
+  /// position in a ride's history.
+  @@unique([rideId, seq])
+  @@index([rideId, createdAt])
+  @@map("ride_events")
+}
+
+/// D6 follow-up. A polyline is stored as ordered points rather than a string so
+/// the driver app can redraw progressively as points arrive, and so distance is
+/// derivable without a re-parse. Written by the trip-tracking flow.
+model RoutePoint {
+  id        BigInt   @id @default(autoincrement())
+  rideId    String
+  seq       Int
+  lat       Decimal
+  lng       Decimal
+  speedKph  Decimal?
+  headingDeg Decimal?
+  recordedAt DateTime
+
+  ride Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
+
+  @@unique([rideId, seq])
+  @@index([rideId])
+  @@map("route_points")
+}
+
+// ---------------------------------------------------------------------------
+// §4.7 idempotency
+// ---------------------------------------------------------------------------
+
+/// Deduplicates retried POSTs.
+///
+/// The distinction that matters: a completed request returns the *stored response*
+/// rather than re-executing. Re-executing a requestRide would create a second
+/// ride, and a retried request must not be able to do that.
+model IdempotencyKey {
+  id          String   @id @default(uuid())
+  key         String
+  userId      String
+  /// Hash of the request body, so the same key with a different payload is a
+  /// client bug rather than a silent wrong answer.
+  requestHash String
+  rideId      String?
+  status      String   @default("IN_PROGRESS")
+  responseCode Int?
+  responseBody Json?
+  expiresAt   DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ride Ride? @relation(fields: [rideId], references: [id], onDelete: SetNull)
+
+  @@unique([key, userId])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
+
+// ---------------------------------------------------------------------------
+// §4.6 outbox
+// ---------------------------------------------------------------------------
+
+/// Written inside the ride transaction, delivered afterwards. This is the only
+/// reason a committed ride cannot fail to notify anyone.
+model OutboxMessage {
+  id            BigInt       @id @default(autoincrement())
+  eventType     String
+  aggregateId   String
+  seq           Int?
+  correlationId String
+  payload       Json
+
+  status      OutboxStatus @default(PENDING)
+  /// Incremented per attempt. MAX_ATTEMPTS in outbox.relay.ts moves a row to DEAD;
+  /// it stays DEAD rather than being deleted so the failure is investigable.
+  attempts     Int          @default(0)
+  lastError    String?
+  availableAt  DateTime     @default(now())
+  publishedAt  DateTime?
+  createdAt    DateTime     @default(now())
+
+  ride Ride? @relation(fields: [aggregateId], references: [id], onDelete: Cascade)
+
+  /// Matches the relay's claim query exactly: PENDING rows, oldest first, that
+  /// are due. The index exists so the poll is not a sequential scan of dead rows.
+  @@index([status, availableAt, id])
+  @@index([aggregateId])
+  @@map("outbox_messages")
+}
+
+// ---------------------------------------------------------------------------
+// §4.7 notifications
+// ---------------------------------------------------------------------------
+
+/// Durable record of every push attempt, keyed by (ride, seq, recipient).
+///
+/// Redis SETNX is the fast dedupe path; this row is the durable one. Redis alone
+/// is not sufficient because a flush would otherwise resurrect already-delivered
+/// notifications.
+model NotificationDelivery {
+  id            String             @id @default(uuid())
+  dedupeKey     String             @unique
+  userId        String
+  rideId        String
+  status        NotificationStatus
+  attempts      Int                @default(0)
+  failureReason String?
+  sentAt        DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ride Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
+
+  @@index([rideId])
+  @@index([userId, status])
+  @@map("notification_deliveries")
+}
+
+/// The inbox — the notification a user can actually come back and read.
+///
+/// A separate table from `NotificationDelivery`, and the separation is the point.
+/// `NotificationDelivery` answers "was this pushed, to whom, how many times, and
+/// why did it fail"; it is an audit of a transport, and its `status` is about
+/// FCM. Folding a `readAt` onto it would mean one row carrying two independent
+/// fates — a push that failed to FCM but that the user has plainly seen, because
+/// they were looking at the open app, is `status: FAILED, readAt: <set>` — and
+/// every query over either concern would have to know about the other.
+///
+/// The write path is separate too. Push needs a device token, so it goes through a
+/// queue to a worker; this is a single INSERT driven straight off the outbox. That
+/// is what lets a user with no registered device still have an inbox, which is
+/// every user of the web build.
+model InAppNotification {
+  id String @id @default(uuid())
+
+  /// The §4.7 tuple again — (ride, seq, recipient) — but in its own column.
+  /// Uniqueness here is the whole idempotency mechanism: the relay is
+  /// at-least-once, so this row is attempted more than once, and `skipDuplicates`
+  /// turns the second attempt into a no-op. No Redis SETNX and no delivery-state
+  /// dance is needed for a write that the database can arbitrate itself.
+  dedupeKey String @unique
+
+  userId String
+  rideId String
+  kind   InAppNotificationKind
+
+  /// Copy is frozen at write time rather than re-rendered on read. A template
+  /// change is a product decision about what notifications say *now*; rewriting
+  /// the text of a notification from last month would edit history the user has
+  /// already acted on.
+  title String
+  body  String
+
+  /// Null means unread. There is no separate `isRead` boolean to fall out of
+  /// sync with this column, and the query the badge needs is
+  /// `WHERE userId = ? AND readAt IS NULL`, which the index below serves.
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Cascade, so deleting a ride takes its inbox entries with it. That is also
+  /// the natural bound on this table's growth — every row belongs to exactly one
+  /// ride, and rides do not outlive their usefulness.
+  ride Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
+
+  /// Ordered (userId, readAt, createdAt DESC) rather than (userId, createdAt):
+  /// the newest-first list and the unread count are the two queries that run on
+  /// every page load, and this index answers both. Postgres can use a btree for
+  /// `readAt IS NULL`, so the unreadOnly variant is not a scan.
+  @@index([userId, readAt, createdAt(sort: Desc)])
+  @@map("in_app_notifications")
+}

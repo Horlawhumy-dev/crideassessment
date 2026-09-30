@@ -1,0 +1,164 @@
+name: verify
+
+# The two halves are verified together, in dependency order, because the whole
+# point of the contract check is that it runs against the *real* API. A contract
+# check against a mock verifies the mock.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  api:
+    name: api (typecheck, unit, e2e)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cride
+          POSTGRES_PASSWORD: cride
+          POSTGRES_DB: cride
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd redis-cli ping
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    defaults:
+      run:
+        working-directory: cride_bend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: cride_bend/package-lock.json
+
+      - run: npm ci
+
+      - name: env
+        run: |
+          {
+            echo "NODE_ENV=test"
+            echo "DATABASE_URL=postgresql://cride:cride@localhost:5432/cride?schema=public"
+            echo "REDIS_URL=redis://localhost:6379"
+            echo "JWT_ACCESS_SECRET=$(openssl rand -hex 32)"
+            echo "JWT_REFRESH_SECRET=$(openssl rand -hex 32)"
+            echo "CORS_ORIGIN=http://localhost:3000"
+          } >> "$GITHUB_ENV"
+
+      # `migrate deploy`, not `migrate dev`. In CI the schema is an input, not
+      # something to be invented; a migration that only works interactively fails
+      # here instead of on a laptop.
+      - run: npm run db:deploy
+
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:e2e:ci
+
+  web:
+    name: web (typecheck, design tokens, unit, build, live contract)
+    runs-on: ubuntu-latest
+    needs: api
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cride
+          POSTGRES_PASSWORD: cride
+          POSTGRES_DB: cride
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd redis-cli ping
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    defaults:
+      run:
+        working-directory: cride_fend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: cride_fend/package-lock.json
+
+      - run: npm ci
+
+      - name: env
+        run: |
+          {
+            echo "DATABASE_URL=postgresql://cride:cride@localhost:5432/cride?schema=public"
+            echo "REDIS_URL=redis://localhost:6379"
+            echo "JWT_ACCESS_SECRET=$(openssl rand -hex 32)"
+            echo "JWT_REFRESH_SECRET=$(openssl rand -hex 32)"
+            echo "CORS_ORIGIN=http://localhost:3000"
+            echo "NEXT_PUBLIC_API_URL=http://localhost:4000"
+          } >> "$GITHUB_ENV"
+
+      - run: npm run typecheck
+      - run: npm run check:styles
+      - run: npm test
+
+      # The API is started here, in this job, against real Postgres and Redis,
+      # because `check:api` diffs `lib/generated/api.d.ts` against a live
+      # `/docs-json`. Regenerating and checking in one step would make the drift
+      # check vacuous: it would always compare the file to itself.
+      - name: start api
+        working-directory: cride_bend
+        run: |
+          npm run db:deploy
+          npm run build
+          nohup node dist/main.js > /tmp/api.log 2>&1 &
+
+      - name: wait for api
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:4000/health > /dev/null; then
+              echo "api up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "api did not become healthy"
+          tail -50 /tmp/api.log
+          exit 1
+
+      - name: contract drift
+        run: npm run check:api
+
+      - run: npm run build
