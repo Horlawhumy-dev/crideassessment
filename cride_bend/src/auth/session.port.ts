@@ -3,9 +3,9 @@ import { createHash, randomBytes } from 'node:crypto';
 export const SESSION_STORE = Symbol('SESSION_STORE');
 
 /**
- * Refresh tokens are opaque random bytes, stored only as a SHA-256 hash, and grouped
- * into a family. Presenting an already-used token means two parties hold it, so the
- * whole family is revoked: the thief and the victim are logged out together.
+ * Refresh tokens are opaque random bytes stored only as a SHA-256 hash, grouped into a
+ * family. Presenting an already-used token means two parties hold it, so the family is
+ * revoked: the thief and the victim are logged out together.
  */
 export interface SessionStore {
   issue(input: {
@@ -15,7 +15,7 @@ export interface SessionStore {
     expiresAt: Date;
   }): Promise<void>;
 
-  /** null covers unknown, revoked or expired alike; only 'REPLAYED' burns the family. */
+  /** null covers unknown, revoked and expired alike; only 'REPLAYED' burns the family. */
   consume(token: string): Promise<{ userId: string; familyId: string } | 'REPLAYED' | null>;
 
   revokeFamily(familyId: string): Promise<void>;

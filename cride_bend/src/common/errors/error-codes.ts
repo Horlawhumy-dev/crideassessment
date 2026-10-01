@@ -1,7 +1,6 @@
 /**
- * The single source of truth for the error contract; the frontend switches on `code`,
- * never on `message`. The Record<ErrorCode, ErrorMeta> shape makes a code with no
- * declared status a compile error, so the registry cannot drift.
+ * The error contract's single source of truth; clients switch on `code`, never on
+ * `message`. The Record<ErrorCode, ErrorMeta> shape makes a missing status a compile error.
  */
 export const ERROR_CODES = [
   'INVALID_COORDINATES',
@@ -103,14 +102,14 @@ export const ERROR_REGISTRY: Record<ErrorCode, ErrorMeta> = {
   TOKEN_REVOKED: {
     status: 401,
     category: 'AUTHN',
-    // Means a token that was real has been consumed or its family revoked: the theft
-    // signal auth.service warns on. Never-issued tokens use INVALID_REFRESH_TOKEN.
+    // A token that was real was consumed or its family revoked: the theft signal
+    // auth.service warns on. Never-issued tokens use INVALID_REFRESH_TOKEN.
     defaultMessage: 'Your session has been revoked.',
   },
   INVALID_REFRESH_TOKEN: {
     status: 401,
     category: 'AUTHN',
-    // "Not a credential we ever issued", kept distinct from TOKEN_REVOKED so it does not read as theft.
+    // "Never issued by us", kept distinct from TOKEN_REVOKED so it does not read as theft.
     defaultMessage: 'The refresh token is invalid or has expired.',
   },
   MISSING_TOKEN: {

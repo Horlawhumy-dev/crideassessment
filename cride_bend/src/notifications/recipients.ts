@@ -8,15 +8,11 @@ export interface NotificationRecipient {
 
 /**
  * Who an event notifies. One function, shared by the push enqueue and the inbox write,
- * because the two are answering the same question and must not answer it differently.
- *
- * The rule is "notify the party the event is *about*, not the one who caused it", with
- * two deliberate exceptions: the rider is never told about their own `ride.requested`
- * (they are looking at the screen that created it), and the driver is never told about
- * the `ride.accepted` they just performed.
- *
- * `ride.requested` fans out to every available driver, which is matching's job, not
- * this function's — hence the empty set.
+ * because the two must not answer the same question differently. The rule is "notify the
+ * party the event is *about*, not the one who caused it", with two exceptions: the rider is
+ * never told about their own `ride.requested`, and the driver is never told about the
+ * `ride.accepted` they just performed. `ride.requested` fans out to every available driver,
+ * which is matching's job — hence the empty set.
  */
 export function recipientsFor(
   eventType: OutboxEventType,
@@ -38,13 +34,12 @@ export function recipientsFor(
 
 /**
  * The idempotency key for one (ride, event, recipient), deliberately the *same string*
- * `NotificationDedupe` builds in a different column of a different table: `NotificationDelivery`
- * and `InAppNotification` are separate tables because push and inbox are two independent
- * fates on one record — a push can fail while the inbox row was written, and the user still
- * saw the notification. Sharing the format lets the two be joined on it.
- *
- * `seq ?? 0` because a null seq is not a different event; it must still collide with its
- * own replay rather than producing a fresh key on every attempt.
+ * `NotificationDedupe` builds in a different column of a different table:
+ * `NotificationDelivery` and `InAppNotification` are separate tables because push and inbox
+ * are two independent fates on one record — a push can fail while the inbox row was written,
+ * and the user still saw the notification. Sharing the format lets the two be joined on it.
+ * `seq ?? 0` because a null seq is not a different event: it must still collide with its own
+ * replay rather than producing a fresh key on every attempt.
  */
 export function inAppDedupeKey(rideId: string, seq: number | null, userId: string): string {
   return `${rideId}:${seq ?? 0}:${userId}`;

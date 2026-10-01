@@ -2,7 +2,7 @@ import { distanceMetres, type GeoPoint } from '../../kernel/geo-point';
 import { money, multiply, add, type Money } from '../../kernel/money';
 import { DomainError } from '../../common/errors/domain-error';
 
-/** Pure fare table; surge pricing and a configurable table are deliberately not built. */
+/** Pure fare table; the policy is passed in so the domain never reads configuration. */
 export interface FarePolicy {
   readonly baseFareMinor: bigint;
   readonly perKmMinor: bigint;

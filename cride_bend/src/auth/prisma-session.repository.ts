@@ -29,7 +29,7 @@ export class PrismaSessionRepository implements SessionStore {
       if (row.expiresAt.getTime() < Date.now()) return null;
 
       if (row.usedAt !== null) {
-        // A token that already rotated is a replay: burn the whole family before returning.
+        // Replay of an already-rotated token: burn the family before returning.
         await tx.refreshToken.updateMany({
           where: { familyId: row.familyId, revokedAt: null },
           data: { revokedAt: new Date() },
@@ -37,8 +37,8 @@ export class PrismaSessionRepository implements SessionStore {
         return 'REPLAYED';
       }
 
-      // `usedAt: null` in the where clause is the lock: two concurrent refreshes
-      // cannot both claim, so the loser is caught as a replay instead of both winning.
+      // `usedAt: null` in the where clause is the lock: concurrent refreshes cannot
+      // both claim, so the loser is seen as a replay rather than both winning.
       const claimed = await tx.refreshToken.updateMany({
         where: { id: row.id, usedAt: null, revokedAt: null },
         data: { usedAt: new Date() },

@@ -6,8 +6,8 @@ import { ProducerOnly } from './producer-only.decorator';
 import { QueueProducer } from './producer';
 import { ALL_QUEUES } from './queues';
 
-/** Producers are registered in both roles so either process can enqueue. Consumers live
- * in notifications/, which is what lets the API run with the worker scaled to zero. */
+/** Producers are registered in both roles so either process can enqueue. Consumers live in
+ * notifications/, which is what lets the API run with the worker scaled to zero. */
 @Module({
   imports: [
     BullModule.forRootAsync({

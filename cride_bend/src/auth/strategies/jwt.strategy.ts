@@ -10,8 +10,7 @@ import { ACCESS_COOKIE } from '../../common/openapi/cookie-names';
 
 /**
  * A narrow scan, not a full cookie parse: `decodeURIComponent` throws on a malformed
- * value, and a throw inside an extractor surfaces as a 500 on an unauthenticated
- * request instead of passport's 401.
+ * value, and a throw inside an extractor surfaces as a 500 instead of passport's 401.
  */
 function cookieExtractor(name: string) {
   return (req: Request): string | null => {
@@ -41,9 +40,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private readonly tokens: TokenService,
   ) {
     super({
-      // Cookie *and* bearer, header first. A browser cannot set the header without a
-      // script holding the token, so httpOnly is its only path; the header lets a seed
-      // script or test override a stale cookie.
+      // Cookie *and* bearer, header first: httpOnly is a browser's only path to the
+      // cookie, and the header lets a seed script or test override a stale cookie.
       jwtFromRequest: ExtractJwt.fromExtractors([
         ExtractJwt.fromAuthHeaderAsBearerToken(),
         cookieExtractor(ACCESS_COOKIE),

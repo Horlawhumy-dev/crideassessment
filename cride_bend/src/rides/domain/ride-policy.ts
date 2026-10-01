@@ -2,12 +2,9 @@ import { RideNotVisibleError, ForbiddenRoleError, RideAlreadyAcceptedError, Ride
 import type { Ride } from './ride';
 import { InvalidTransitionError, type RideStatus } from './ride-status';
 
-/**
- * Resource-scoped authorization as pure domain logic. A role gate answers "may a
- * driver do this kind of thing?"; only an ownership check answers "may THIS driver
- * do it to THIS ride?". `assertCanAccept` is a precondition, not the concurrency
- * control — `acceptIfRequested`'s WHERE clause decides the outcome.
- */
+/** Resource-scoped authorization as pure domain logic. A role gate answers "may a driver
+ *  do this kind of thing?"; only an ownership check answers "may THIS driver do it to THIS
+ *  ride?". `assertCanAccept` is a precondition, not the concurrency control. */
 export interface Principal {
   readonly userId: string;
   readonly role: 'RIDER' | 'DRIVER';
@@ -27,13 +24,9 @@ export function assertCanView(ride: Ride, p: Principal): void {
   throw new RideNotVisibleError(ride.id);
 }
 
-/**
- * Cancellation is the one transition whose permission depends on the ride's
- * current status, so it cannot live in a role table: a rider may cancel only while
- * `REQUESTED` (after a driver commits it is a no-show, not a cancellation) while
- * the assigned driver may end any live ride, because only they can know the trip
- * is impossible.
- */
+/** Cancellation is the one permission that depends on `ride.status`, so it cannot live in a
+ *  role table: a rider may cancel only while `REQUESTED` — once a driver commits, stopping it
+ *  is a no-show — while the assigned driver may end any live ride and stays on the row. */
 export function assertCanCancel(ride: Ride, p: Principal): void {
   assertCanView(ride, p);
 
@@ -53,7 +46,6 @@ export function assertCanCancel(ride: Ride, p: Principal): void {
   }
 }
 
-/** The statuses in which the assigned driver may end the ride. */
 export const DRIVER_CANCELLABLE_STATUSES: readonly RideStatus[] = ['ACCEPTED', 'IN_PROGRESS'];
 
 export function assertCanAccept(ride: Ride, p: Principal): void {

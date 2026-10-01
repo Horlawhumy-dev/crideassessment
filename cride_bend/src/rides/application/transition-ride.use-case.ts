@@ -18,13 +18,8 @@ const EVENT_FOR_STATUS = {
   CANCELLED: 'ride.cancelled',
 } as const;
 
-/**
- * §4.5.2c — the generic transition path, guarded by `version`.
- *
- * This use-case is also what the socket's `ride:transition` handler calls,
- * unchanged (§4.8.2). The socket is a transport; the use-case is the system. That
- * is why there is exactly one way a ride state can change.
- */
+/** The generic transition path, guarded by `version`: a stale caller gets
+ *  RIDE_VERSION_CONFLICT rather than last-writer-wins. `ride:transition` calls this too. */
 @Injectable()
 export class TransitionRideUseCase {
   constructor(
@@ -48,45 +43,30 @@ export class TransitionRideUseCase {
       const current = await this.rides.findById(rideId, tx);
       if (!current) throw new RideNotFoundError(rideId);
 
-      // The order of these four checks is the whole contract, and each position is
-      // load-bearing. Moving any of them changes which error a client sees, which
-      // is not cosmetic: the four answer four different questions.
+      // The order of these four checks is the contract: each answers a different
+      // question, and the four return different codes.
       //
-      // 1. Visibility, first and always. 404 rather than 403 because a 403 confirms
-      //    the ride exists. Everything below this line may therefore describe the
-      //    ride's status and version without leaking anything to a stranger.
+      // 1. Visibility, first. 404 rather than 403, since 403 confirms the ride exists.
       assertCanView(current, principal);
 
-      // 2. Terminality, before any actor policy. A terminal ride admits no
-      //    transition from *anyone*, so asking the actor policy first would answer
-      //    a question about permissions for a ride that is simply over — and
-      //    `assertCanTransition` routes `to: ACCEPTED` into the accept path, which
-      //    would report RIDE_ALREADY_ACCEPTED for a ride that finished an hour ago.
+      // 2. Terminality before actor policy: a terminal ride admits no transition from
+      //    anyone, and `assertCanTransition` would report RIDE_ALREADY_ACCEPTED for a
+      //    ride that finished an hour ago.
       if (isTerminal(current.status)) {
         throw new InvalidTransitionError(current.status, dto.to);
       }
 
-      // 3. The version guard, before the state table — and this ordering is what
-      //    makes optimistic concurrency mean anything. Under READ COMMITTED the
-      //    read above can observe a *competitor's committed* transition: two
-      //    clients both holding version 2 ask for IN_PROGRESS, one wins, and the
-      //    loser's pre-read then sees IN_PROGRESS and reports INVALID_TRANSITION.
-      //    That is the wrong answer to give a client — it tells the caller to stop
-      //    retrying when the correct response is to refetch. Comparing the
-      //    client-supplied version first makes the outcome deterministic:
-      //    whoever reads a bumped version is a stale caller, whoever loses the
-      //    conditional UPDATE below is also a stale caller, and both get the same
-      //    code. Only checked when a version was supplied; omitting it is the
-      //    documented last-writer-wins convenience path.
+      // 3. The version guard before the state table. Under READ COMMITTED the read
+      //    above can observe a *competitor's committed* transition, so the loser would
+      //    be told INVALID_TRANSITION — which tells the caller to stop retrying when
+      //    the right answer is to refetch. Omitting `version` is last-writer-wins.
       if (dto.version !== undefined && dto.version !== current.version) {
         this.metrics.counter('ride_status_transition_errors').inc({ reason: 'version_conflict' });
         throw new RideVersionConflictError(rideId, dto.version, current.version);
       }
 
-      // 4. Authorization and legality as pure functions, before any write. The
-      //    actor policy runs before the table so that a rider attempting to drive a
-      //    ride forward is told FORBIDDEN_ROLE rather than being told the move is
-      //    legal and then failing the permission check.
+      // 4. Actor policy before legality, so a rider driving a ride forward is told
+      //    FORBIDDEN_ROLE rather than that the move is legal.
       assertCanTransition(current, principal, dto.to);
       assertTransition(current.status, dto.to, principal.role);
 

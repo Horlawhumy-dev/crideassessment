@@ -10,10 +10,10 @@ import { inAppDedupeKey, recipientsFor } from '../../notifications/recipients';
 import { renderNotification, fareFromPayload } from '../../notifications/templates/ride-templates';
 import type { OutboxEnvelope, OutboxPublisher } from '../outbox.publisher';
 
-/** The inbox write, straight off the relay with no queue: an inbox row is one INSERT into
- * a table this process already talks to, and the outbox already supplies what the queue
- * was wanted for — the write lands only after the ride committed, and a crash between
- * commit and write leaves a PENDING row for the next poll. */
+/** The inbox write, straight off the relay with no queue: an inbox row is one INSERT into a
+ * table this process already talks to, and the outbox already supplies what the queue was
+ * wanted for — the write lands only after the ride committed, and a crash between commit and
+ * write leaves a PENDING row for the next poll. */
 @Injectable()
 export class InAppNotificationHandler implements OutboxPublisher {
   private readonly logger = new Logger(InAppNotificationHandler.name);
@@ -32,8 +32,8 @@ export class InAppNotificationHandler implements OutboxPublisher {
 
     const kind = kindFor(eventType);
     if (!kind) {
-      // Logged, not thrown: returning successfully must not hold the row PENDING and
-      // retry a message that will never be renderable.
+      // Logged, not thrown: returning successfully must not hold the row PENDING and retry
+      // a message that will never be renderable.
       this.logger.warn('inapp.unknown_kind', { eventType });
       return;
     }
@@ -42,10 +42,9 @@ export class InAppNotificationHandler implements OutboxPublisher {
     if (recipients.length === 0) return;
 
     const fare = fareFromPayload(payload);
-    // `title`/`body` are picked explicitly rather than spread from
-    // `renderNotification`: that returns a `data` bag for the FCM payload, which is not
-    // a column here, and a spread smuggles it into `createMany` where Prisma rejects
-    // the unknown argument.
+    // `title`/`body` picked explicitly rather than spread from `renderNotification`: that
+    // returns a `data` bag for the FCM payload, which is not a column here, and a spread
+    // smuggles it into `createMany` where Prisma rejects the unknown argument.
     const rows: NewInAppNotification[] = recipients.map((recipient) => {
       const message = renderNotification(kind, { rideId: aggregateId, fare, actor: recipient.role });
       return {
@@ -60,8 +59,8 @@ export class InAppNotificationHandler implements OutboxPublisher {
 
     const inserted = await this.inbox.recordAll(rows);
 
-    // A persistent gap here means duplicate dispatch is happening far more often than
-    // it should, so it is worth a debug line.
+    // A persistent gap here means duplicate dispatch is happening far more often than it
+    // should, so it is worth a debug line.
     if (inserted < rows.length) {
       this.logger.debug('inapp.deduped', {
         rideId: aggregateId,

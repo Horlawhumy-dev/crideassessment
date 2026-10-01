@@ -4,10 +4,8 @@ import { RidesGateway } from '../rides/rides.gateway';
 import { EgressGuard } from '../platform/realtime/egress-guard';
 
 /**
- * The egress half: store.subscribe to RidesGateway.emitDriverLocation, so the store
- * port needs `subscribe`. It lives here because the gateway owns room topology, while
- * positions arriving over Redis pub/sub and expiring within seconds is tracking's
- * business; the rides -> tracking dependency already exists.
+ * Wires store.subscribe to RidesGateway.emitDriverLocation. It lives here because the
+ * gateway owns room topology while short-lived Redis positions are tracking's business.
  */
 @Injectable()
 export class LocationEgress implements OnModuleInit {
@@ -28,7 +26,7 @@ export class LocationEgress implements OnModuleInit {
       const key = `loc|${rideId}|${location.driverId}|${location.recordedAt.toISOString()}`;
       void this.egressGuard.claimOnce(key).then((claimed) => {
         if (!claimed) return;
-        // Emits into the ride:join room; there is deliberately no second join path for tracking.
+        // Emits into the ride:join room; there is deliberately no second join path.
         this.gateway.emitDriverLocation(rideId, location);
       });
     });

@@ -9,10 +9,8 @@ import { OUTBOX_PORT, type OutboxPort } from './ports/outbox.port';
 import { RIDE_EVENTS_PORT, type RideEventsPort } from './ports/ride-events.port';
 import { RIDE_CACHE_PORT, type RideCachePort } from './ports/ride-cache.port';
 
-/**
- * The conditional UPDATE runs first; only on zero rows is the disambiguating SELECT
- * issued, after the write. A read first would leave the race window open.
- */
+/** `acceptIfRequested` is one atomic conditional statement. A lost race is disambiguated
+ *  by reading *after* that write, never before — a read first would leave the window open. */
 @Injectable()
 export class AcceptRideUseCase {
   constructor(
@@ -32,9 +30,8 @@ export class AcceptRideUseCase {
     const now = new Date();
 
     const ride = await this.tx.run(async (tx) => {
-      // The version is needed to build the write predicate, so the row is read
-      // first — but that read cannot influence the outcome, only the error message:
-      // the database re-evaluates the predicate at write time.
+      // The version is needed to build the write predicate, so the row is read first —
+      // but that read cannot influence the outcome, only the error message.
       const preflight = await this.rides.findById(rideId, tx);
       if (!preflight) throw new RideNotFoundError(rideId);
 
@@ -47,7 +44,6 @@ export class AcceptRideUseCase {
         now,
       );
 
-      // Only now, and only on failure, do we read to disambiguate.
       if (!won) {
         const current = await this.rides.findById(rideId, tx);
         if (!current) throw new RideNotFoundError(rideId);
@@ -62,9 +58,8 @@ export class AcceptRideUseCase {
       const accepted = await this.rides.findById(rideId, tx);
       if (!accepted) throw new RideNotFoundError(rideId);
 
-      // Post-condition, not the precondition: assertCanAccept would now fail on its
-      // own successful write. The conditional update won, the row is ACCEPTED and it
-      // is *this* driver; anything else means the read and write disagreed.
+      // A post-condition, not a precondition: `assertCanAccept` would now fail on its
+      // own successful write. Anything else means the read and the write disagreed.
       if (accepted.status !== 'ACCEPTED' || accepted.driverId !== principal.userId) {
         throw new RideAlreadyAcceptedError(rideId);
       }

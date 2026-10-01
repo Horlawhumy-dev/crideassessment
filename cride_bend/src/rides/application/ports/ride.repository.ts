@@ -31,7 +31,8 @@ export interface ListRidesFilter {
 export interface RideRepository {
   findById(rideId: string, tx?: TransactionContext): Promise<Ride | null>;
 
-  /** Active ride for a rider, used to enforce one-ride-per-rider. */
+  /** The rider's active ride. The partial unique index on (riderId) WHERE status IN
+   *  ACTIVE_STATUSES is the real enforcement; this read only produces a better error. */
   findActiveByRider(riderId: string, tx?: TransactionContext): Promise<Ride | null>;
 
   findMany(filter: ListRidesFilter): Promise<Page<Ride>>;
@@ -40,10 +41,8 @@ export interface RideRepository {
 
   create(tx: TransactionContext, input: CreateRideInput): Promise<Ride>;
 
-  /**
-   * Single atomic statement: 0 rows means disambiguate by reading the ride *after*
-   * the write, never before.
-   */
+  /** One atomic statement: 0 rows means disambiguate by reading the ride *after* the
+   *  write, never before. */
   acceptIfRequested(
     tx: TransactionContext,
     rideId: string,

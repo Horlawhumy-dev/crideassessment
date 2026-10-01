@@ -5,8 +5,7 @@ import type { OutboxEnvelope, OutboxPublisher } from '../outbox.publisher';
 
 /** The durable polyline, written once when the trip ends. Driven by the outbox rather than
  * called from the transition use-case because the buffer is in Redis and the rows are in
- * Postgres, with no transaction spanning both — and because 2,000 route points do not belong
- * on the request path of `PATCH /rides/:id/status`. */
+ * Postgres, with no transaction spanning both. */
 @Injectable()
 export class RouteRecorderHandler implements OutboxPublisher {
   private readonly logger = new Logger(RouteRecorderHandler.name);
@@ -23,16 +22,16 @@ export class RouteRecorderHandler implements OutboxPublisher {
   async handle(envelope: OutboxEnvelope): Promise<void> {
     const rideId = envelope.aggregateId;
 
-    // `drain` on a ride that buffered nothing is a wasted round trip, and a very
-    // short trip is the common case for `ride.completed`.
+    // `drain` on a ride that buffered nothing is a wasted round trip, and a very short trip
+    // is the common case for `ride.completed`.
     if ((await this.buffer.size(rideId)) === 0) return;
 
     const samples = await this.buffer.drain(rideId);
     if (samples.length === 0) return;
 
-    // seq is 1-based to match `ride_events`, so the two streams can be reasoned
-    // about together and neither starts at a magic zero. `skipDuplicates` against the
-    // (rideId, seq) unique index is what makes the at-least-once retry safe.
+    // seq is 1-based to match `ride_events`, so the two streams can be reasoned about
+    // together. `skipDuplicates` against the (rideId, seq) unique index is what makes the
+    // at-least-once retry safe.
     const written = await this.prisma.routePoint.createMany({
       data: samples.map((s, i) => ({
         rideId,

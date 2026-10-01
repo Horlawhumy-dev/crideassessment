@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MetricsService } from '../otel/metrics';
 import { RedisClient } from './redis.client';
 
-/** Every Redis call is wrapped with a timeout and a circuit breaker, so a Redis outage
+/** Every Redis call is wrapped in a timeout and a circuit breaker, so a Redis outage
  * degrades to a cache miss instead of making Redis a hard dependency of the request path. */
 @Injectable()
 export class CacheService {
@@ -10,9 +10,8 @@ export class CacheService {
   private failures = 0;
   private openedAt: number | null = null;
 
-  // Five consecutive failures trip the breaker. Consecutive rather than a rate over a
-  // window: a cache that fails intermittently is still serving, and tripping on it
-  // would turn a degraded cache into an absent one.
+  // Consecutive rather than a rate over a window: a cache that fails intermittently is
+  // still serving, and tripping on it turns a degraded cache into an absent one.
   private static readonly FAILURE_THRESHOLD = 5;
   private static readonly HALF_OPEN_AFTER_MS = 15_000;
   private static readonly COMMAND_TIMEOUT_MS = 250;
@@ -29,7 +28,7 @@ export class CacheService {
   /**
    * Symmetric with `set`, which JSON-stringifies on the way in, so the `<T>` is honest.
    * A parse failure is a miss rather than an error: a malformed entry is unusable, and
-   * the contract here is that Redis never fails a request.
+   * Redis never fails a request.
    */
   async get<T>(key: string): Promise<T | null> {
     const raw = await this.exec('get', () => this.redis.client.get(key), null);

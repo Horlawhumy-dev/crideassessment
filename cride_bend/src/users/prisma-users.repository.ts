@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../platform/prisma/prisma.service';
 import type { CreateUserInput, UserRecord, UsersRepository } from './users.repository';
 
-/** A file named "prisma" may know Prisma exists; nothing above the infrastructure layer imports this. */
+/** The only file above the infrastructure layer allowed to know Prisma exists. */
 @Injectable()
 export class PrismaUsersRepository implements UsersRepository {
   constructor(private readonly prisma: PrismaService) {}

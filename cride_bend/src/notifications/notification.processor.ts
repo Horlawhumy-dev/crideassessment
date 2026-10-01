@@ -20,9 +20,9 @@ interface NotificationJob {
 
 const MAX_DELIVERY_ATTEMPT = 3;
 
-/** The only consumer of the ride-notifications queue. A dead FCM token is dropped rather
- * than retried: retrying a permanent failure is how a queue ends up wedged with jobs that
- * can never succeed. */
+/** The only consumer of the ride-notifications queue. A dead FCM token is DROPPED, not
+ * retried: retrying a permanent failure is how a queue ends up wedged with jobs that can
+ * never succeed. */
 @Processor(QUEUE_RIDE_NOTIFICATIONS, { concurrency: 10 })
 export class NotificationProcessor extends WorkerHost {
   private readonly logger = new Logger(NotificationProcessor.name);
@@ -39,8 +39,8 @@ export class NotificationProcessor extends WorkerHost {
     const job = raw.data;
     const kind = kindFor(job.eventType);
     if (!kind) {
-      // The one consumer reading a `string` off a queue payload, where a job enqueued by
-      // an older deploy can name an event this build no longer has. Unrenderable is not
+      // The one consumer reading a `string` off a queue payload, where a job enqueued by an
+      // older deploy can name an event this build no longer has. Unrenderable is not
       // retryable, so this returns rather than throwing.
       this.logger.warn('notification.unknown_kind', { eventType: job.eventType });
       return;
@@ -51,14 +51,14 @@ export class NotificationProcessor extends WorkerHost {
     for (const userId of job.recipients) {
       const tokens = tokensByUser.get(userId) ?? [];
       if (tokens.length === 0) {
-        // Not an error: a rider on the web app legitimately has no device token. Their
-        // inbox is a separate outbox consumer that does not consult this map.
+        // Not an error: a rider on the web app legitimately has no device token. Their inbox
+        // is a separate outbox consumer that does not consult this map.
         this.logger.debug('notification.no_device_token', { userId });
         continue;
       }
 
-      // Dedupe key is (ride, seq, recipient), so three delivery attempts still produce
-      // one notification.
+      // Dedupe key is (ride, seq, recipient), so three delivery attempts still produce one
+      // notification.
       const dedupeKey = inAppDedupeKey(job.rideId, job.seq, userId);
       if (!(await this.dedupe.claim(dedupeKey, userId, job.rideId))) {
         this.logger.debug('notification.deduped', { dedupeKey });

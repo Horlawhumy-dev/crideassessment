@@ -5,10 +5,8 @@ import { RedisRideCacheAdapter } from './redis-ride-cache.adapter';
 import { RIDE_CACHE_KEYS, type RideCachePort } from '../application/ports/ride-cache.port';
 import type { Ride } from '../domain/ride';
 
-/**
- * Round-trip against a fake that JSON-serialises like the real `CacheService`; a
- * stub holding object references would never exercise the wire form.
- */
+/** Round-trips against a fake that JSON-serialises like the real `CacheService`; a stub
+ *  holding object references would never exercise the wire form. */
 describe('RedisRideCacheAdapter', () => {
   /** Mimics CacheService: JSON on write, JSON.parse on read. Swallows nothing. */
   class FakeCache {
@@ -53,8 +51,7 @@ describe('RedisRideCacheAdapter', () => {
     } as Ride;
   }
 
-  // `loadConfig`, not a stub, so the TTL assertion is about the real default. The
-  // URLs are supplied only because the schema requires them.
+  // `loadConfig`, not a stub, so the TTL assertion is about the real default.
   function build(cache: FakeCache): RideCachePort {
     const cfg = loadConfig({
       DATABASE_URL: 'postgresql://unused:unused@localhost:5432/unused',
@@ -86,7 +83,7 @@ describe('RedisRideCacheAdapter', () => {
     const back = await adapter.get('ride-1');
 
     expect(back).not.toBeNull();
-    // A string here would 500 at `toResponse` on the cache-hit path only.
+    // A string here would 500 at `toResponse`, on the cache-hit path only.
     expect(back!.fare!.amountMinor).toBe(BigInt(9100));
     expect(back!.createdAt).toBeInstanceOf(Date);
     expect(back!.acceptedAt).toBeInstanceOf(Date);

@@ -6,8 +6,8 @@ export interface Gauge { set(value: number, labels?: Record<string, string | num
 
 function noop(): void {}
 
-/** In-process registry; an OTLP exporter later. Behind an interface so the call sites do
- * not change when it lands. `outbox_lag_seconds` is the health metric for delivery. */
+/** In-process registry behind an interface, so call sites do not change when an OTLP
+ * exporter lands. `outbox_lag_seconds` is the health metric for delivery. */
 @Injectable()
 export class MetricsService {
   private readonly counters = new Map<string, Map<string, number>>();

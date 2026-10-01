@@ -2,24 +2,9 @@ import { z } from 'zod';
 import { RIDE_STATUSES, type RideStatus } from '../domain/ride-status';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../kernel/page-cursor';
 
-/**
- * `status` takes a comma-separated list as well as a single value: `?status=ACCEPTED,IN_PROGRESS`.
- *
- * This is additive — a single value still works — and it exists for one reason:
- * "what is my current ride?" is the first question both the rider's and the
- * driver's home screen ask, and the answer is "the one in REQUESTED, ACCEPTED or
- * IN_PROGRESS". Asking for that with a single-value filter means three requests
- * from the home screen, or a client-side filter over one page, which is wrong
- * because it is a status the server is authoritative about.
- *
- * The `@@index([riderId, status])` on Ride already exists for precisely this
- * lookup, so this is a query the database was indexed for and the API declined
- * to expose.
- *
- * An unknown value is a validation error rather than being silently dropped: a
- * typo in a filter that returns *more* rows than expected is a wrong answer
- * presented as a right one.
- */
+/** `status` takes a comma-separated list as well as a single value, so
+ *  `?status=REQUESTED,ACCEPTED,IN_PROGRESS` answers "what is my current ride?" in one request
+ *  — the first question both home screens ask. An unknown value is a validation error. */
 const statusList = z
   .string()
   .transform((value, ctx) => {
@@ -40,8 +25,7 @@ const statusList = z
       return z.NEVER;
     }
 
-    // Deduplicated: `?status=ACCEPTED,ACCEPTED` is a client bug, and it should not
-    // change the shape of the generated `IN` clause.
+    // Deduplicated, so a client bug does not change the shape of the `IN` clause.
     return [...new Set(parts)] as RideStatus[];
   })
   .optional();

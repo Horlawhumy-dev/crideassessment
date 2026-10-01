@@ -47,12 +47,8 @@ export interface InAppNotificationRepository {
   recordAll(rows: readonly NewInAppNotification[]): Promise<number>;
   listFor(userId: string, filter: InAppListFilter): Promise<Page<InAppNotificationRecord>>;
   countUnread(userId: string): Promise<number>;
-  /**
-   * Marks one read, or reports it was already read.
-   *
-   * `null` covers both an id that does not exist and one belonging to somebody else,
-   * indistinguishably, so this cannot confirm that an id exists in another inbox.
-   */
+  /** `null` covers both an id that does not exist and one belonging to somebody else,
+   * indistinguishably, so this cannot confirm that an id exists in another inbox. */
   markRead(userId: string, id: string): Promise<InAppMarkReadResult | null>;
   markAllRead(userId: string): Promise<number>;
 }
@@ -62,10 +58,10 @@ export class PrismaInAppNotificationRepository implements InAppNotificationRepos
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * `createMany` with `skipDuplicates` rather than a loop of `upsert`s: one round trip,
-   * no read-modify-write a concurrent replay could interleave with. The durable row *is*
-   * the claim — the second insert of the same (ride, seq, recipient) violates a unique
-   * index, so a relay replay is a no-op rather than a second row.
+   * `createMany` with `skipDuplicates` rather than a loop of `upsert`s: one round trip, no
+   * read-modify-write a concurrent replay could interleave with. The durable row *is* the
+   * claim — a second insert of the same (ride, seq, recipient) violates a unique index, so a
+   * relay replay is a no-op rather than a second row.
    */
   async recordAll(rows: readonly NewInAppNotification[]): Promise<number> {
     if (rows.length === 0) return 0;
@@ -78,11 +74,10 @@ export class PrismaInAppNotificationRepository implements InAppNotificationRepos
 
   /**
    * Keyset-paginated on (createdAt DESC, id): an inbox grows forever, and an offset would
-   * skip or repeat rows the moment a new notification arrives mid-scroll.
-   *
-   * The cursor is `createdAt < c OR (createdAt = c AND id < c.id)` rather than a tuple
-   * comparison — both correct in Postgres, but only the disjunction is guaranteed to use
-   * the (userId, readAt, createdAt DESC) index instead of sorting the rest.
+   * skip or repeat rows the moment a new notification arrives mid-scroll. The cursor is
+   * `createdAt < c OR (createdAt = c AND id < c.id)` rather than a tuple comparison — both
+   * correct in Postgres, but only the disjunction is guaranteed to use the
+   * (userId, readAt, createdAt DESC) index instead of sorting the rest.
    */
   async listFor(userId: string, filter: InAppListFilter): Promise<Page<InAppNotificationRecord>> {
     const rows = await this.prisma.inAppNotification.findMany({
@@ -117,8 +112,7 @@ export class PrismaInAppNotificationRepository implements InAppNotificationRepos
    * `updateMany` on `{id, userId, readAt: null}` rather than `update` on the id: an entry
    * that is not the caller's is a miss, not a permission error, and the `readAt: null`
    * predicate makes a second mark a no-op that returns the ORIGINAL `readAt` instead of
-   * moving the timestamp. It also settles concurrent tabs without a lock — whichever lands
-   * first wins and the other is a silent no-op.
+   * moving the timestamp. It also settles concurrent tabs without a lock.
    */
   async markRead(userId: string, id: string): Promise<InAppMarkReadResult | null> {
     const readAt = new Date();

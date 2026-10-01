@@ -21,11 +21,9 @@ import { OUTBOX_PORT } from './application/ports/outbox.port';
 import { RIDE_EVENTS_PORT } from './application/ports/ride-events.port';
 import type { FarePolicy } from './domain/fare';
 
-/**
- * §4.2 — the wiring is the enforcement. `rides` declares ports; the adapters
- * that satisfy them are bound here and nowhere else. It does not import
- * `notifications` or `queues`, because it does not know push exists.
- */
+/** The wiring is the enforcement: `rides` declares ports and their adapters are bound here and
+ *  nowhere else. It imports neither `notifications` nor `queues` because it does not know
+ *  push exists. */
 @Module({
   imports: [forwardRef(() => AuthModule), DriverModule],
   controllers: [RidesController],

@@ -20,11 +20,9 @@ import {
 
 /**
  * Owns the PUSH_PORT binding, overriding the no-op fallback in platform/push/push.module.ts
- * when FCM credentials are present.
- *
- * `NotificationProcessor` is instantiated in both roles rather than worker-only: the queue
- * is empty in the API role, so an idle consumer costs nothing and avoids role-conditional
- * wiring. `OutboxModule` imports this module to reach `IN_APP_NOTIFICATION_REPOSITORY`;
+ * when FCM credentials are present. `NotificationProcessor` is instantiated in both roles
+ * rather than worker-only: the queue is empty in the API role, so an idle consumer costs
+ * nothing. `OutboxModule` imports this module to reach `IN_APP_NOTIFICATION_REPOSITORY`;
  * `notifications` imports nothing from `outbox`, so that edge is not a cycle.
  */
 @Module({
@@ -38,8 +36,8 @@ import {
     { provide: IN_APP_NOTIFICATION_REPOSITORY, useExisting: PrismaInAppNotificationRepository },
     {
       provide: PUSH_PORT,
-      // The repository is passed explicitly rather than injected into FcmAdapter:
-      // it is built by a factory, so a constructor decorator would never resolve.
+      // The repository is passed explicitly rather than injected into FcmAdapter: it is
+      // built by a factory, so a constructor decorator would never resolve.
       inject: [ConfigService, DEVICE_TOKEN_REPOSITORY],
       useFactory: (
         config: ConfigService,

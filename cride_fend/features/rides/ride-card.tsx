@@ -104,6 +104,7 @@ export function RideCard({
   pending,
   onTransition,
   onCancel,
+  onDismiss,
   busy,
 }: {
   ride: Ride;
@@ -112,6 +113,7 @@ export function RideCard({
   pending: RideStatus | null;
   onTransition: (status: RideStatus) => void;
   onCancel?: () => void;
+  onDismiss?: () => void;
   busy?: boolean;
 }) {
   const meta = RIDE_STATUS_META[ride.status];
@@ -215,6 +217,23 @@ export function RideCard({
               </Button>
             );
           })}
+        </footer>
+      )}
+
+      {/**
+       * The way out of a finished ride, in the rider's hands rather than a timer.
+       *
+       * A terminal card has no actions, so without this the only way past it was
+       * the provider's automatic release — which meant a rider who wanted to read
+       * their fare could not dismiss it, and one who did not want to read it had to
+       * wait. Dismissal is local: it clears the active ride and leaves the room, and
+       * the ride is already in history.
+       */}
+      {actions.length === 0 && onDismiss && (
+        <footer className="border-t border-border p-4">
+          <Button variant="outline" size="lg" className="touch-target w-full" onClick={onDismiss}>
+            {ride.status === 'COMPLETED' ? 'Book another ride' : 'Dismiss'}
+          </Button>
         </footer>
       )}
     </article>

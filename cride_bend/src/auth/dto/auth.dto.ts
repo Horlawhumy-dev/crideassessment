@@ -14,9 +14,8 @@ export const loginSchema = z.object({
 });
 
 /**
- * Optional: the `cride.refresh` cookie is the primary credential and a browser
- * cannot read localStorage. Required here, the pipe would 400 an empty body
- * before the controller could ever read the cookie.
+ * Optional: the `cride.refresh` cookie is the primary credential and Zod cannot read
+ * it, so requiring it here would make the cookie path unreachable.
  */
 export const refreshSchema = z.object({
   refreshToken: z.string().min(20).optional(),

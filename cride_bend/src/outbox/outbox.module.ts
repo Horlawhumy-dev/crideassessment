@@ -10,15 +10,11 @@ import { InAppNotificationHandler } from './outbox.handlers/in-app-notification.
 import { DriverOfferHandler } from './outbox.handlers/driver-offer.handler';
 import { RouteRecorderHandler } from './outbox.handlers/route-recorder.handler';
 
-/**
- * `OutboxRegistrar` is not optional: being listed as a provider instantiates a handler,
- * and only `OutboxRelay.register()` makes it reachable.
- *
- * `QueueModule` and `NotificationsModule` are imported because the handlers inject
- * `QueueProducer` and `IN_APP_NOTIFICATION_REPOSITORY`. `@Global()` makes a module's
- * providers injectable everywhere but does not make its exports resolvable, so the edge
- * still has to be declared.
- */
+/** `OutboxRegistrar` is not optional: listing a handler as a provider only instantiates it,
+ * and only `OutboxRelay.register()` makes it reachable. `QueueModule`/`NotificationsModule`
+ * are imported because the handlers inject `QueueProducer` and
+ * `IN_APP_NOTIFICATION_REPOSITORY` — `@Global()` makes providers injectable everywhere but
+ * does not make an export resolvable, so the edge still has to be declared. */
 @Global()
 @Module({
   imports: [QueueModule, RouteBufferModule, NotificationsModule],

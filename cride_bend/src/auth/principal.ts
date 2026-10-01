@@ -6,7 +6,7 @@ export interface AuthTokens {
   readonly accessExpiresInSeconds: number;
 }
 
-/** Claims are minimal by design: a JWT payload is base64, not encrypted, so no PII. */
+/** Claims are minimal: a JWT payload is base64, not encrypted, so it carries no PII. */
 export interface AccessTokenClaims {
   readonly sub: string;
   readonly role: 'RIDER' | 'DRIVER';

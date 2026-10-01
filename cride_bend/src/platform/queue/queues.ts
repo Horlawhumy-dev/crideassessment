@@ -1,4 +1,3 @@
-/** Queue names and their per-queue concurrency. */
 export const QUEUE_RIDE_NOTIFICATIONS = 'ride-notifications';
 export const QUEUE_RIDE_MATCHING = 'ride-matching';
 export const QUEUE_RIDE_EXPIRY = 'ride-expiry';

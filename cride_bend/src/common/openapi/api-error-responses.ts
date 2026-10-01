@@ -5,9 +5,9 @@ import { ERROR_REGISTRY, type ErrorCode } from '../errors/error-codes';
 import { ACCESS_SECURITY, BEARER_SECURITY, REFRESH_SECURITY } from './build-openapi-document';
 
 /**
- * Statuses are read from ERROR_REGISTRY, the same map the exception filter reads, so a
- * documented status cannot disagree with a thrown one. Security scheme names are
- * imported because `ApiSecurity` matches by name, and a typo documents nothing.
+ * Statuses come from ERROR_REGISTRY, the same map the exception filter reads, so a
+ * documented status cannot disagree with a thrown one. Scheme names are imported
+ * because `ApiSecurity` matches by name, and a typo documents nothing.
  */
 
 /** Standard failure responses. The route's own security is declared separately. */
@@ -23,10 +23,7 @@ export function ApiErrorResponses(...codes: ErrorCode[]) {
   return applyDecorators(ApiExtraModels(ErrorEnvelopeDto), ...responses);
 }
 
-/**
- * Both security schemes, because JwtAuthGuard accepts either: documenting only one
- * would tell browser clients to do something they cannot.
- */
+/** Both schemes, because JwtAuthGuard accepts either: documenting one would send browsers down the wrong path. */
 export function ApiAuthedErrorResponses(...codes: ErrorCode[]) {
   return applyDecorators(
     ApiSecurity(ACCESS_SECURITY),

@@ -3,23 +3,15 @@ import { ConfigService } from '@nestjs/config';
 import { APP_CONFIG, type AppConfig } from '../../config/configuration';
 import type { FarePolicy } from '../domain/fare';
 
-/**
- * §4.14.4 — the fare table, sourced from configuration.
- *
- * `estimateFare` stays pure and still takes a policy argument, so the domain
- * tests keep asserting against a literal table. This is the one place that
- * turns environment variables into that table, which is what makes the amounts
- * configurable without the domain ever reading process.env.
- */
+/** The one place environment variables become a `FarePolicy`, so `estimateFare` stays pure
+ *  and the domain never reads process.env. */
 @Injectable()
 export class FarePolicyProvider {
   readonly policy: FarePolicy;
 
   constructor(config: ConfigService) {
-    // The same `get<AppConfig>(APP_CONFIG)!` shape used everywhere else in the
-    // codebase, rather than the `{ infer: true }` overload: APP_CONFIG is a plain
-    // string token, so `infer` has nothing to infer from and widens every field to
-    // `string | number | boolean | string[]`.
+    // `get<AppConfig>(APP_CONFIG)!`, not the `{ infer: true }` overload: APP_CONFIG is
+    // a plain string token, so `infer` widens every field to string | number | boolean.
     const app = config.get<AppConfig>(APP_CONFIG)!;
 
     this.policy = {
@@ -32,8 +24,6 @@ export class FarePolicyProvider {
   }
 }
 
-/**
- * Injection token. A use-case depends on this rather than on the provider, so a
- * test can supply a literal policy without constructing a ConfigService.
- */
+/** A use-case depends on this token, not on the provider, so a test can supply a literal
+ *  policy without constructing a ConfigService. */
 export const FARE_POLICY = 'FARE_POLICY';

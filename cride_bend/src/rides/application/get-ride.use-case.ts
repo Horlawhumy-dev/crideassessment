@@ -11,13 +11,8 @@ export interface RideDetail {
   readonly events: readonly RideEvent[];
 }
 
-/**
- * §4.10.2 read-through.
- *
- * Note step 1 precedes step 2. Authorizing *after* a cache hit would make the
- * cache an authorization decision, which is P1 and P3 violated: a cached object
- * scoped for one viewer could be served to another.
- */
+/** Read-through. Authorization runs *after* the cache read but the cache is never an
+ *  authorization input: a cached object scoped for one viewer must not be served to another. */
 @Injectable()
 export class GetRideUseCase {
   constructor(
@@ -35,9 +30,8 @@ export class GetRideUseCase {
       this.metrics.counter('ride_cache_total').inc({ result: 'miss' });
       ride = await this.rides.findById(rideId);
       if (!ride) throw new RideNotFoundError(rideId);
-      // Post-read, so a cache hit never bypasses the ownership check above.
-      // No explicit TTL: the adapter owns `RIDE_CACHE_TTL_SECONDS`. A literal 30
-      // here meant the documented config knob silently did nothing.
+      // Populate after the ownership check, so a hit never bypasses it. No literal
+      // TTL: the adapter owns RIDE_CACHE_TTL_SECONDS.
       await this.cache.set(ride).catch(() => undefined);
     }
 
@@ -47,12 +41,8 @@ export class GetRideUseCase {
     return { ride, events };
   }
 
-  /**
-   * §4.8.3 — events after a sequence, for socket resync.
-   *
-   * Takes an already-authorised Ride rather than a principal, so a caller cannot
-   * reach an event stream without having passed assertCanView for that ride.
-   */
+  /** Takes an already-authorised `Ride`, not a principal, so a caller cannot reach an
+   *  event stream without having passed `assertCanView` for that ride. */
   async eventsAfter(ride: Ride, lastSeq: number): Promise<RideEvent[]> {
     return this.rides.listEvents(ride.id, lastSeq);
   }

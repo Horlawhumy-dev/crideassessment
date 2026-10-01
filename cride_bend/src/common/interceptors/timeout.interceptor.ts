@@ -5,7 +5,11 @@ import { TimeoutError, throwError, type Observable } from 'rxjs';
 import { catchError, timeout } from 'rxjs/operators';
 import { DomainError } from '../errors/domain-error';
 
-/** A hard cap, so a slow dependency becomes a coded 500 rather than a hung socket. */
+/**
+ * A hard cap, so a slow dependency becomes a coded 500 rather than a hung socket. It
+ * also covers WebSocket handlers on purpose: a location ping that never resolves holds
+ * a driver connection open indefinitely.
+ */
 @Injectable()
 export class TimeoutInterceptor implements NestInterceptor {
   constructor(private readonly config: ConfigService) {}

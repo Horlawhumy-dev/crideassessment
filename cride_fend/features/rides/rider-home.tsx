@@ -30,7 +30,7 @@ import { useRideTransitions } from './use-ride-transitions';
  * answer: what the server says is happening now.
  */
 export function RiderHome() {
-  const { state, adoptRide, driverLocation, displayLocation, driverPath } = useRideState();
+  const { state, adoptRide, dismissRide, driverLocation, displayLocation, driverPath } = useRideState();
   const transitions = useRideTransitions();
   const [serverError, setServerError] = useState<ApiError | null>(null);
   const [center, setCenter] = useState<GeoPoint | null>(null);
@@ -128,6 +128,7 @@ export function RiderHome() {
           busy={transitions.busy}
           onTransition={handleTransition}
           onCancel={() => void handleCancel()}
+          onDismiss={dismissRide}
         />
       ) : active.isPending ? (
         <div className="space-y-3">

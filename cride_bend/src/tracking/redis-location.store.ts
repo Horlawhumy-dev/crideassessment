@@ -35,7 +35,7 @@ export class RedisLocationStore implements LocationStore {
 
   async put(rideId: string, location: DriverLocation, ttlSeconds: number): Promise<void> {
     // speedKph and accuracyM are persisted, not just published: the stored value is what
-    // the next frame's sanity checks read, so a null is written as an empty string.
+    // the next frame's checks read, so a null is written as an empty string.
     await this.redis.client.hset(`ride:loc:${rideId}`, {
       driverId: location.driverId,
       lat: String(location.position.lat),
@@ -77,8 +77,8 @@ export class RedisLocationStore implements LocationStore {
   }
 
 /**
- * Direct pub/sub, deliberately not the outbox: a GPS ping is worthless after 60 s, so
- * a Postgres write and the relay latency it adds would deliver already-stale data.
+ * Direct pub/sub, not the outbox: a GPS ping is worthless after 60 s, so a Postgres write
+ * and the relay latency it adds would deliver already-stale data.
  */
   async publish(rideId: string, location: DriverLocation): Promise<void> {
     await this.redis.client.publish(CHANNEL(rideId), JSON.stringify(serialise(location)));

@@ -1,8 +1,6 @@
-/**
- * §4.17. MUST be the first import in main.ts and worker.ts, before anything that
- * pulls in an instrumented library. The auto-instrumentation packages patch module
- * loaders, so importing them later registers hooks too late to observe startup.
- */
+/** MUST be the first import in main.ts and worker.ts, before anything that pulls in an
+ * instrumented library: the auto-instrumentation packages patch module loaders, so importing
+ * them later registers hooks too late to observe startup. */
 import { config } from 'dotenv';
 
 async function bootstrapTelemetry(): Promise<void> {
@@ -23,8 +21,8 @@ async function bootstrapTelemetry(): Promise<void> {
     }),
     instrumentations: [
       getNodeAutoInstrumentations({
-        // §36: an HTTP client library that logs full request bodies is how
-        // passwords and coordinates end up in a tracing backend.
+        // An instrumented HTTP client that logs full request bodies is how passwords
+        // and coordinates end up in a tracing backend.
         '@opentelemetry/instrumentation-fs': { enabled: false },
       }),
     ],

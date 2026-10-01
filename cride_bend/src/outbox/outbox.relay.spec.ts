@@ -3,11 +3,9 @@ import type { OutboxEnvelope, OutboxPublisher } from './outbox.publisher';
 import type { PrismaService } from '../platform/prisma/prisma.service';
 import { MetricsService } from '../platform/otel/metrics';
 
-/**
- * At-least-once is deliberate, and only safe because handlers are idempotent. These pin
- * the three behaviours that follow: a crashed handler is retried, a permanently failing
- * handler is quarantined, and a message with no subscriber is still marked done.
- */
+/** At-least-once is deliberate and only safe because handlers are idempotent. These pin the
+ * three behaviours that follow: a crashed handler is retried, a permanently failing one is
+ * quarantined, and a message with no subscriber is still marked done. */
 interface Row {
   id: bigint;
   eventType: string;
@@ -47,8 +45,8 @@ class FakePrisma {
     },
   };
 
-  /** The callback receives this instance as the transaction handle, which is what Prisma
-   * does — so the claim and its update commit together. */
+  /** The callback gets this instance as the transaction handle, which is what Prisma does —
+   * so the claim and its update commit together. */
   $transaction = <T>(fn: (tx: unknown) => Promise<T>): Promise<T> => Promise.resolve(fn(this));
 }
 
@@ -148,8 +146,8 @@ describe('OutboxRelay', () => {
     const update = prisma.updates.at(-1);
     expect(update?.data.status).toBe('DEAD');
     expect(update?.data.attempts).toBe(8);
-    // Retained rather than deleted: "which ride never got its notification" has to
-    // be answerable after the fact.
+    // Retained rather than deleted: "which ride never got its notification" has to be
+    // answerable after the fact.
     expect(prisma.rows).toHaveLength(1);
     expect(prisma.rows[0]?.lastError).toContain('down');
   });
@@ -170,8 +168,8 @@ describe('OutboxRelay', () => {
   });
 
   it('does not publish until every handler has succeeded', async () => {
-    // Partial delivery is worse than a retry: the rider gets a push while the socket
-    // update is silently missing, and nothing ever repairs it.
+    // Partial delivery is worse than a retry: the rider gets a push while the socket update
+    // is silently missing, and nothing ever repairs it.
     const prisma = new FakePrisma();
     prisma.rows = [row()];
     const relay = relayWith(prisma);
@@ -191,8 +189,8 @@ describe('OutboxRelay', () => {
     prisma.rows = [row({ eventType: 'ride.started' })];
     const relay = relayWith(prisma);
     relay.register(new RecordingHandler('realtime', 0));
-    // A handler that opts out of this event type, as the notification handler
-    // does for driver-offer events.
+    // A handler that opts out of this event type, as the notification handler does for
+    // driver-offer events.
     const uninterested: OutboxPublisher = {
       canHandle: (eventType) => eventType !== 'ride.started',
       handle: async () => undefined,
@@ -205,9 +203,9 @@ describe('OutboxRelay', () => {
   });
 
   it('processes a batch independently, so one poison message does not block the rest', async () => {
-    // Row 2 is one attempt from the limit; rows 1 and 3 are fresh. If a failure
-    // aborted the batch, rows 1 and 3 would be left in PROCESSING forever and the
-    // queue would stall behind a single bad message.
+    // Row 2 is one attempt from the limit; rows 1 and 3 are fresh. If a failure aborted the
+    // batch, rows 1 and 3 would sit in PROCESSING forever and the queue would stall behind
+    // a single bad message.
     const prisma = new FakePrisma();
     prisma.rows = [row({ id: 1n }), row({ id: 2n, attempts: 7 }), row({ id: 3n })];
     const relay = relayWith(prisma);
@@ -218,7 +216,6 @@ describe('OutboxRelay', () => {
 
     // Every row was attempted, i.e. the throw was contained per message.
     expect(handler.seen.map((e) => e.aggregateId)).toHaveLength(3);
-
     const byId = new Map(prisma.updates.map((u) => [u.id, u.data.status]));
     expect(byId.get(2n)).toBe('DEAD');
     expect(byId.get(1n)).toBe('PENDING');

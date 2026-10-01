@@ -1,8 +1,5 @@
-/**
- * The transaction boundary as a port, so the application layer needs "run these
- * steps atomically", not an ORM. `tx` is opaque, so a use-case physically cannot
- * run a query — which is what keeps reads for disambiguation after the write.
- */
+/** The transaction boundary as a port, so the application layer asks for "run these steps
+ *  atomically", not for an ORM. `tx` is opaque, so a use-case cannot query on its own. */
 export type TransactionContext = unknown;
 
 export const TRANSACTION_RUNNER = Symbol('TRANSACTION_RUNNER');

@@ -32,8 +32,8 @@ describe('transition', () => {
   });
 
   it('does not mutate the input', () => {
-    // Immutability lets a use-case keep a pre-image for the audit trail and conflict
-    // detection without a defensive copy.
+    // Immutability lets a use-case keep a pre-image for the audit trail and for
+    // conflict detection without a defensive copy.
     const before = ride();
     const after = transition(before, 'CANCELLED', 'RIDER', NOW);
     expect(before.status).toBe('REQUESTED');

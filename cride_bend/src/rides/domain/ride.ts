@@ -58,10 +58,8 @@ export function hasActiveRide(rides: readonly Ride[]): Ride | undefined {
   return rides.find((r) => isActive(r.status));
 }
 
-/**
- * The only writer of `status` in the domain layer; returns a new Ride for the
- * caller to persist.
- */
+/** The only writer of `status` in the domain layer: it enforces the legal edges, the actor
+ *  matrix, and that an `ACCEPTED` ride has no driver yet. Returns a new Ride. */
 export function transition(
   ride: Ride,
   to: RideStatus,
@@ -74,8 +72,8 @@ export function transition(
     throw new Error('cannot accept a ride that already has a driver');
   }
 
-  // `-readonly`: Partial<Ride> keeps the interface's readonly modifiers, so a plain
-  // Partial cannot be written to. The patch is local and discarded here.
+  // `-readonly` because `Partial<Ride>` keeps the interface's readonly modifiers
+  // and so cannot be written to. The patch is local and discarded here.
   const patch: {
     -readonly [K in keyof Ride]?: Ride[K];
   } = {

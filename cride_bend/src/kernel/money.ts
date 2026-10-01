@@ -1,8 +1,5 @@
-/**
- * Money as integer minor units (3450 = 34.50). BigInt, not a Decimal column:
- * JSON.stringify throws on BigInt, so the string conversion happens exactly once,
- * in `toJSON`.
- */
+/** Money as integer minor units (3450 = 34.50). BigInt, not a Decimal column: `JSON.stringify`
+ *  throws on BigInt, so the string conversion happens exactly once, in `toJSON`. */
 export interface Money {
   readonly amountMinor: bigint;
   readonly currency: string;
@@ -37,7 +34,7 @@ export function isNegative(m: Money): boolean {
   return m.amountMinor < 0n;
 }
 
-/** JSON-safe projection. The only place a Money becomes a string. */
+/** JSON-safe projection. The single point where a Money becomes a string. */
 export function toJSON(m: Money): { amountMinor: string; currency: string } {
   return { amountMinor: m.amountMinor.toString(), currency: m.currency };
 }

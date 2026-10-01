@@ -29,8 +29,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
   /**
    * MUST throw: `AuthGuard.canActivate` returns true unconditionally once the passport
-   * callback has run and nothing downstream re-checks, so returning the user here would
-   * make every authenticated route public.
+   * callback has run, so returning the user here would make every route public.
    */
   handleRequest<TUser>(err: unknown, user: TUser, info: unknown): TUser {
     if (err || !user) {

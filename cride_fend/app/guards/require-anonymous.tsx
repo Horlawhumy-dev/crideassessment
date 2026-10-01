@@ -20,13 +20,16 @@ export function RequireAnonymous({ children }: { children: ReactNode }) {
   const session = useSession();
 
   useEffect(() => {
-    if (session.isLoading) return;
+    // `isUnresolved` too: the check did not complete, so we do not know. Treating
+    // that as signed out would show the sign-in form to somebody with a live
+    // session, and the moment `/auth/me` recovers RequireRole bounces them back.
+    if (session.isLoading || session.isUnresolved) return;
     if (session.isAuthenticated) {
       router.replace(session.role === 'DRIVER' ? '/driver' : '/rider');
     }
-  }, [router, session.isLoading, session.isAuthenticated, session.role]);
+  }, [router, session.isLoading, session.isUnresolved, session.isAuthenticated, session.role]);
 
-  if (session.isLoading) {
+  if (session.isLoading || session.isUnresolved) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
         <p className="text-muted-foreground text-sm">Loading…</p>

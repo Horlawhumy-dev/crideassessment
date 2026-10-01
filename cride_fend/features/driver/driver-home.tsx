@@ -36,7 +36,7 @@ import { useRideTransitions } from '../rides/use-ride-transitions';
  */
 export function DriverHome({ driverId, displayName }: { driverId: string; displayName: string }) {
   const queryClient = useQueryClient();
-  const { state, adoptRide, connection, displayLocation, simulating, startSimulation, stopSimulation } = useRideState();
+  const { state, adoptRide, dismissRide, connection, displayLocation, simulating, startSimulation, stopSimulation } = useRideState();
   const transitions = useRideTransitions();
 
   const availability = useQuery({
@@ -233,6 +233,7 @@ export function DriverHome({ driverId, displayName }: { driverId: string; displa
             busy={transitions.busy}
             onTransition={(status: RideStatus) => void transitions.run(activeRide, status)}
             onCancel={() => void handleCancel()}
+            onDismiss={dismissRide}
           />
 
           {/* §11. A driver on a laptop has no phone feeding fixes, so a live trip

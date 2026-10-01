@@ -3,9 +3,8 @@ import { RedisClient } from '../platform/cache/redis.client';
 import { ROUTE_BUFFER, type RouteBuffer, type RoutePointSample } from './route-buffer.port';
 
 /**
- * The cap is the point: without it a ride that is cancelled or abandoned keeps a list
- * growing until the TTL fires. With it, memory is bounded and the oldest points are
- * dropped first — the start of a route is the least interesting end of it.
+ * The cap is the point: without it an abandoned ride's list grows until the TTL fires.
+ * With it memory is bounded and the oldest points go first — the least interesting end.
  */
 const MAX_POINTS_PER_RIDE = 2_000;
 
@@ -37,16 +36,15 @@ export class RedisRouteBuffer implements RouteBuffer {
     };
 
     // RPUSH then LTRIM keeps the newest MAX points. Not pipelined: the commands are
-    // independent and an extra round trip per GPS frame is a poor trade on a poor connection.
+    // independent, and an extra round trip per GPS frame is a poor trade on a bad connection.
     await this.redis.client.rpush(key, JSON.stringify(payload));
     await this.redis.client.ltrim(key, -MAX_POINTS_PER_RIDE, -1);
     await this.redis.client.expire(key, TTL_SECONDS);
   }
 
   /**
-   * LRANGE + DEL in one MULTI. At-least-once outbox delivery can overlap two drains, and
-   * the transaction is what stops them reading the same points, or deleting points
-   * appended after the read.
+   * LRANGE + DEL in one MULTI. Overlapping drains (at-least-once delivery) would
+   * otherwise read the same points, or delete points appended after the read.
    */
   async drain(rideId: string): Promise<readonly RoutePointSample[]> {
     const key = KEY(rideId);

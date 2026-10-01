@@ -143,23 +143,62 @@ export function getSocket(): Socket {
   return socket;
 }
 
+/**
+ * Reference counting, so the connection outlives a route change but not the session.
+ *
+ * The provider mounts in the layout above the role routes, so in practice it is
+ * mounted once — but "once" is a property of where it happens to be mounted today,
+ * not of this module, and a refcount makes the lifetime explicit instead of assumed.
+ *
+ * Why not disconnect on the last release: the app router remounts route groups on
+ * navigation, so tearing the socket down there costs a fresh handshake and a window
+ * of dropped frames on every page change. Why not leave it open forever: a signed-out
+ * user kept a live authenticated socket, and the next session to sign in on that tab
+ * reused it — rooms and listeners belonging to the previous identity.
+ *
+ * The idle timeout is the compromise, and it is what makes "long-lived" safe: keep
+ * the socket warm across navigations, but release it once nothing has needed it for
+ * a while. A user who signs out and back in pays one handshake; a user clicking
+ * around the app pays none.
+ */
+let consumers = 0;
+let idleTimer: ReturnType<typeof setTimeout> | null | undefined;
+
+const IDLE_DISCONNECT_MS = 30_000;
+
+function cancelIdle(): void {
+  if (idleTimer === null) return;
+  clearTimeout(idleTimer);
+  idleTimer = null;
+}
+
 export function acquireSocket(): Socket {
+  consumers += 1;
+  cancelIdle();
   return getSocket();
 }
 
 /**
- * Deliberately a no-op.
- *
- * Disconnecting when the last consumer unmounts costs a full handshake on every
- * route change in the app router, and drops frames in between. The connection is
- * cheap and long-lived, and the server already tears it down when the session is
- * revoked.
+ * Drop one consumer. The socket closes only when the last one leaves *and* the idle
+ * window expires, so a route change never costs a handshake.
  */
 export function releaseSocket(): void {
-  /* intentionally empty */
+  consumers = Math.max(0, consumers - 1);
+  if (consumers > 0 || idleTimer !== null) return;
+
+  idleTimer = setTimeout(() => {
+    idleTimer = null;
+    if (consumers === 0) disconnectSocket();
+  }, IDLE_DISCONNECT_MS);
 }
 
+/**
+ * Immediate close. For sign-out and session loss, where keeping a socket
+ * authenticated as somebody who is no longer signed in is not acceptable.
+ */
 export function disconnectSocket(): void {
+  cancelIdle();
+  consumers = 0;
   socket?.disconnect();
   socket = null;
 }
@@ -253,6 +292,12 @@ function withAck<T>(event: string, body: unknown, timeoutMs = 5000): Promise<T |
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      // Detach the pending `connect` listener too. Without this, every call made
+      // while the socket was down left a `once('connect')` handler that fired
+      // later — after the 5s timeout had already resolved null — and re-emitted
+      // the request against a socket the caller had already given up on. Location
+      // frames and resyncs are both called in loops, so this accumulated.
+      active.off('connect', send);
       resolve(value);
     };
 

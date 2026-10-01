@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { ApiError } from '../api/errors';
 import { queryKeys } from '../api/query-keys';
+import { disconnectSocket } from '../realtime/socket';
 import type { Principal, SessionUser, UserRole } from '../types';
 
 /**
@@ -22,6 +23,8 @@ import type { Principal, SessionUser, UserRole } from '../types';
 export type SessionState =
   | { status: 'loading'; user: null; role: null }
   | { status: 'anonymous'; user: null; role: null }
+  /** The check itself did not complete. Not the same as signed out. */
+  | { status: 'unresolved'; user: null; role: null }
   | { status: 'authenticated'; user: SessionUser; role: UserRole };
 
 interface MeResponse {
@@ -46,6 +49,17 @@ export function useSession() {
     retry: false,
   });
 
+  /**
+   * A failure we cannot interpret.
+   *
+   * Deliberately distinct from `anonymous`. If a 503 or a dropped connection
+   * resolved to "signed out", a two-second outage would sign every user out and
+   * bounce them to the sign-in form with a session that is still perfectly valid.
+   * `isUnresolved` lets the gate say "we could not check" and offer a retry,
+   * which is the only honest answer when the check itself did not complete.
+   */
+  const isUnresolved = query.isError && query.data === undefined;
+
   const user = query.data?.user ?? null;
   const role = user?.role ?? null;
 
@@ -54,11 +68,14 @@ export function useSession() {
       ? { status: 'loading', user: null, role: null }
       : user
         ? { status: 'authenticated', user, role: user.role }
-        : { status: 'anonymous', user: null, role: null };
+        : isUnresolved
+          ? { status: 'unresolved', user: null, role: null }
+          : { status: 'anonymous', user: null, role: null };
 
   return {
     ...state,
     isLoading: query.isPending && query.data === undefined,
+    isUnresolved,
     isAuthenticated: state.status === 'authenticated',
     /** Refetch on window focus: a session revoked in another tab should end this one. */
     refetch: query.refetch,
@@ -124,6 +141,12 @@ export function useSignOut() {
       // `onSettled`, not `onSuccess`. A logout that fails server-side has still
       // ended the session from the user's point of view, and leaving a stale
       // principal on screen after they pressed "Sign out" is the worse bug.
+      //
+      // The socket goes with it. It is authenticated with the session cookie and
+      // was joined to the previous user's ride rooms; leaving it open means a
+      // signed-out tab still receives somebody's ride frames, and the next sign-in
+      // in that tab reuses the same authenticated connection.
+      disconnectSocket();
       queryClient.setQueryData(queryKeys.session, null);
       queryClient.clear();
     },

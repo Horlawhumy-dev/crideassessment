@@ -7,11 +7,9 @@ import {
   type TransactionContext,
 } from '../application/ports/outbox.port';
 
-/**
- * A plain PostgreSQL table written inside the ride transaction, not a queue — a
- * queue cannot join that commit without a distributed transaction. The id is left
- * to the database: a client-chosen id can collide with the sequence at COMMIT.
- */
+/** A plain PostgreSQL table written inside the ride transaction, not a queue: a queue cannot
+ *  join that commit without a distributed transaction. The id is left to the database, since
+ *  a client-chosen id can collide with the sequence at COMMIT. */
 @Injectable()
 export class PrismaOutboxAdapter implements OutboxPort {
   async enqueue(tx: TransactionContext, event: OutboxEvent): Promise<void> {

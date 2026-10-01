@@ -11,12 +11,11 @@ export class PrismaTransactionAdapter implements TransactionRunner {
 
   async run<T>(fn: (tx: TransactionContext) => Promise<T>): Promise<T> {
     // ReadCommitted is Prisma's default and the right level: the ride paths rely on
-    // row-level conditional updates (UPDATE ... WHERE status = ...) for correctness, not
-    // on multi-statement snapshot isolation.
+    // row-level conditional updates (UPDATE ... WHERE status = ...), not snapshot isolation.
     return this.prisma.$transaction(fn as (tx: Prisma.TransactionClient) => Promise<T>, {
       isolationLevel: 'ReadCommitted',
-      // Bounded so a stuck lock cannot hold connections open until the pool exhausts.
-      // A ride write is single-digit milliseconds; anything near this is a bug.
+      // Bounded so a stuck lock cannot hold connections open until the pool exhausts. A
+      // ride write is single-digit milliseconds; anything near this is a bug.
       timeout: 5_000,
       maxWait: 2_000,
     });

@@ -1,10 +1,7 @@
 import { DomainError } from '../../common/errors/domain-error';
 
-/**
- * The ride state machine. The two `Record<RideStatus, ...>` annotations are
- * exhaustiveness guards: adding a status without updating the maps is a compile
- * error, so every path is forced through them.
- */
+/** The two `Record<RideStatus, ...>` annotations are exhaustiveness guards: a new
+ *  status that skips a map is a compile error, so every path goes through them. */
 
 export const RIDE_STATUSES = [
   'REQUESTED',
@@ -18,11 +15,9 @@ export type RideStatus = (typeof RIDE_STATUSES)[number];
 
 export type RideActor = 'RIDER' | 'DRIVER' | 'SYSTEM';
 
-/**
- * The status graph — deliberately not an actor matrix. `ACCEPTED -> CANCELLED` and
- * `IN_PROGRESS -> CANCELLED` exist because the assigned driver may drop the trip; a
- * rider may not take either. Who may take which edge is `ride-policy.ts`'s job.
- */
+/** The status graph, not an actor matrix: `ACCEPTED`/`IN_PROGRESS -> CANCELLED` exist
+ *  because the assigned driver may drop the trip. Who may take which edge is
+ *  `ride-policy.ts`'s job. */
 export const RIDE_TRANSITIONS: Record<RideStatus, readonly RideStatus[]> = {
   REQUESTED: ['ACCEPTED', 'CANCELLED'],
   ACCEPTED: ['IN_PROGRESS', 'CANCELLED'],
@@ -31,11 +26,8 @@ export const RIDE_TRANSITIONS: Record<RideStatus, readonly RideStatus[]> = {
   CANCELLED: [],
 };
 
-/**
- * Who may move a ride into each status. A list because `CANCELLED` has two legal
- * actors; the narrower "may THIS rider cancel yet?" is `assertCanCancel`, which
- * has the ride in hand. This table only knows roles.
- */
+/** Who may move a ride into each status, by role. A list because `CANCELLED` has two
+ *  legal actors; the narrower "may THIS rider cancel yet?" is `assertCanCancel`. */
 export const TRANSITION_ACTOR: Record<RideStatus, readonly RideActor[]> = {
   REQUESTED: ['RIDER'],
   ACCEPTED: ['DRIVER'],
@@ -73,11 +65,8 @@ export function actorFor(status: RideStatus): readonly RideActor[] {
   return TRANSITION_ACTOR[status];
 }
 
-/**
- * Both extend DomainError, so the exception filter maps them to their registered
- * status; as plain Errors they would surface as a generic 500 with no code for the
- * frontend to switch on.
- */
+/** Both extend `DomainError` so the exception filter maps them to their registered
+ *  status; as plain Errors they would be 500s with no code for the client to switch on. */
 export class InvalidTransitionError extends DomainError {
   constructor(
     readonly from: RideStatus,
@@ -100,11 +89,9 @@ export class WrongActorError extends DomainError {
   }
 }
 
-/**
- * Combines the two rules: is the edge legal, and may this actor make it. `SYSTEM`
- * is deliberately absent from `TRANSITION_ACTOR`, so it is rejected here for every
- * status; `assertSystemExpiry` is the single exemption.
- */
+/** Both rules: is the edge legal, and may this actor drive it. `SYSTEM` is deliberately
+ *  absent from `TRANSITION_ACTOR`, so it is rejected for every status; `assertSystemExpiry`
+ *  is the single exemption. */
 export function assertTransition(
   from: RideStatus,
   to: RideStatus,
@@ -126,11 +113,9 @@ export function assertTransitionForPrincipal(
   assertTransition(from, to, role);
 }
 
-/**
- * The one move a machine may make. Restricting it to `REQUESTED -> CANCELLED` is
- * the substance: a system may end an offer nobody took, never a ride with a driver
- * on it, and an expiry must be distinguishable from a driver cancelling.
- */
+/** The one move a machine may make. Restricting it to `REQUESTED -> CANCELLED` is the
+ *  substance: never a ride that already has a driver, and never indistinguishable from a
+ *  driver cancelling. */
 export function assertSystemExpiry(from: RideStatus, to: RideStatus): void {
   if (from !== 'REQUESTED' || to !== 'CANCELLED') {
     throw new InvalidTransitionError(from, to);

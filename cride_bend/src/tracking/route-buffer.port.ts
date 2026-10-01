@@ -13,10 +13,10 @@ export interface RoutePointSample {
 
 /**
  * The durable polyline: live tracking must not write to PostgreSQL, and the latest
- * position alone leaves no trail. So frames accumulate in a capped Redis list while
- * the trip is live and drain to `route_points` once at completion. A polyline is
- * presentation, so losing it to a Redis flush is acceptable; the cap and TTL bound
- * an abandoned ride, and (rideId, seq) being unique makes a partial drain retryable.
+ * position alone leaves no trail. Frames accumulate in a capped Redis list and drain to
+ * `route_points` at completion. A polyline is presentation, so a Redis flush may lose it;
+ * the cap and TTL bound an abandoned ride, and (rideId, seq) unique makes a partial drain
+ * retryable.
  */
 export interface RouteBuffer {
   /** Buffered as well as stored live; never allowed to fail the frame. */

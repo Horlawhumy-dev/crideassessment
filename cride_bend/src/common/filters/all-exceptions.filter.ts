@@ -5,8 +5,8 @@ import { ERROR_REGISTRY, isErrorCode } from '../errors/error-codes';
 
 /**
  * The single place an exception becomes an HTTP response. A DomainError maps to its
- * registered status and is safe to serialise; anything else is logged with its cause
- * and answered with a generic INTERNAL_ERROR, so driver text never reaches a client.
+ * registered status; anything else is logged with its cause and answered with a generic
+ * INTERNAL_ERROR, so driver text never reaches a client.
  */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {

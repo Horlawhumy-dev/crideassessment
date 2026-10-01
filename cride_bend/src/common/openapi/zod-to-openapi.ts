@@ -3,14 +3,13 @@ import type { SchemaObject } from '@nestjs/swagger/dist/interfaces/open-api-spec
 
 /**
  * OpenAPI 3.0's SchemaObject has no `const` and a narrower index signature than Zod
- * produces, so convert in a permissive alias and cast once at the export boundary.
+ * produces, so convert into a permissive alias and cast once at the export boundary.
  */
 type MutableSchema = Record<string, unknown>;
 
 /**
- * Derives the schema from the Zod schema that actually validates the route, so the
- * two cannot disagree. Outside the supported subset this throws, so an undocumented
- * construct fails the build instead of emitting a wrong document.
+ * Derives the schema from the Zod schema that validates the route, so the two cannot
+ * disagree. An unsupported node throws rather than emitting a wrong document.
  */
 export class UnsupportedZodTypeError extends Error {
   constructor(public readonly path: string, public readonly node: ZodTypeAny) {
@@ -26,7 +25,7 @@ export function zodToOpenApiSchema(schema: ZodTypeAny): SchemaObject {
   return convert(schema, '') as SchemaObject;
 }
 
-/** Attach a stable component name so the schema is reusable and $ref-able. */
+/** A stable component name makes the schema reusable and $ref-able. */
 export function zodToOpenApiComponent(schema: ZodTypeAny, name: string): SchemaObject {
   return { ...convert(schema, ''), title: name } as SchemaObject;
 }
@@ -98,8 +97,7 @@ function convert(node: ZodTypeAny, path: string): MutableSchema {
       return inner;
     }
 
-    // Peeled by convertObject; reaching here means it was nested somewhere this
-    // converter does not model.
+    // Peeled by convertObject; reaching here means it was nested somewhere unmodelled.
     case z.ZodFirstPartyTypeKind.ZodOptional:
     case z.ZodFirstPartyTypeKind.ZodNullable:
       throw new UnsupportedZodTypeError(path, node);

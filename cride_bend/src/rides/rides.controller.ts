@@ -28,12 +28,8 @@ import { ApiAuthedErrorResponses } from '../common/openapi/api-error-responses';
 import { RIDE_STATUSES } from './domain/ride-status';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../kernel/page-cursor';
 
-/**
- * §4.4 — thin by construction: bind, call exactly one use-case, map to a status
- * code. No business rules, no repository access, no cache or socket calls. The
- * 41-of-the-product-doc anti-pattern (logic in the controller) is prevented by
- * there being nothing here to put it in.
- */
+/** Thin by construction: bind, call exactly one use-case, map to a status code. No business
+ *  rules, no repository, no cache or socket calls — there is nothing here to put them in. */
 @ApiTags('rides')
 @Controller('rides')
 @UseGuards(JwtAuthGuard)

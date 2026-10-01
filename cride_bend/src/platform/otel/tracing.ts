@@ -3,12 +3,12 @@ import { context, trace, SpanStatusCode, type Span } from '@opentelemetry/api';
 
 const tracer = trace.getTracer('cride');
 
-/** Instrumentation is in src/instrumentation.ts, which must be imported before anything
- * else — the auto-instrumentation patches loaders, so importing it later registers hooks
- * too late to observe startup. */
+/** Instrumentation lives in src/instrumentation.ts, which must be imported before anything
+ * else: the auto-instrumentation patches loaders, so a later import registers hooks too
+ * late to observe startup. */
 @Injectable()
 export class TracingService {
-  /** Motivating span: "why did accepting this ride take 1.8s?" */
+  /** The motivating span: "why did accepting this ride take 1.8s?" */
   async span<T>(name: string, attributes: Record<string, string | number | boolean>, fn: (span: Span) => Promise<T>): Promise<T> {
     return tracer.startActiveSpan(name, { attributes }, async (span) => {
       try {

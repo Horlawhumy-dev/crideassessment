@@ -8,7 +8,7 @@ import type { AccessTokenClaims } from './principal';
 
 /**
  * The one access-token verifier, shared by the HTTP strategy and the Socket.IO
- * handshake: two verifiers drift, and a drifting verifier is an authentication bypass.
+ * handshake: two verifiers drift, and a drifting verifier is an auth bypass.
  */
 @Injectable()
 export class TokenService {
@@ -32,7 +32,7 @@ export class TokenService {
 
   verify(token: string): AccessTokenClaims {
     try {
-      // Pinned explicitly: never trust the header's alg, and never accept `none`.
+      // Pinned: never trust the header's alg, never accept `none`.
       return this.jwt.verify<AccessTokenClaims>(token, {
         algorithms: ['HS256'],
         secret: this.config.get<AppConfig>(APP_CONFIG)!.JWT_SECRET,

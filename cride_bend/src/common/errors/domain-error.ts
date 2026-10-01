@@ -2,8 +2,7 @@ import { ERROR_REGISTRY, type ErrorCode, type ErrorCategory } from './error-code
 
 /**
  * The only error type the application and domain layers may throw; anything else is
- * logged with its cause and answered generically. `details` is field-level for
- * validation and never a stack trace.
+ * logged with its cause and answered generically. `details` is field-level, never a stack.
  */
 export class DomainError extends Error {
   readonly code: ErrorCode;
@@ -84,10 +83,7 @@ export class ForbiddenRoleError extends DomainError {
   }
 }
 
-/**
- * Maps to 404 deliberately: telling a user a ride exists when they cannot see it
- * is an enumeration oracle.
- */
+/** 404 deliberately: telling a user a ride exists when they cannot see it is an enumeration oracle. */
 export class RideNotVisibleError extends DomainError {
   constructor(rideId: string) {
     super('RIDE_NOT_VISIBLE', undefined, { rideId });
@@ -149,9 +145,8 @@ export class UserNotFoundError extends DomainError {
 }
 
 /**
- * Thrown both when the inbox id is nobody's and when it is another user's, on purpose:
- * a distinct "exists but not yours" answer lets a caller walk ids and learn who has
- * which notifications.
+ * Also the answer for "that notification is not yours", on purpose: a distinct
+ * "exists but not yours" lets a caller walk ids and learn who has which notifications.
  */
 export class NotificationNotFoundError extends DomainError {
   constructor(notificationId: string) {

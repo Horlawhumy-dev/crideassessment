@@ -6,12 +6,11 @@ import type { DeviceTokenRepository } from './device-token.repository';
 
 /**
  * FCM specifics that decide whether push is operable or merely present:
- *
  *  - An invalid token is a *permanent* failure (`messaging/registration-token-not-registered`,
- *    `messaging/invalid-argument`). Retrying it is the most common cause of a push queue
- *    that can never drain, so the token is revoked on first sight.
- *  - Multicast is capped at 500 tokens per call and the SDK rejects the whole batch past
- *    that, so the input is chunked rather than truncated.
+ *    `messaging/invalid-argument`). Retrying it is the most common cause of a push queue that
+ *    can never drain, so the token is revoked on first sight.
+ *  - Multicast is capped at 500 tokens per call and the SDK rejects the whole batch past that,
+ *    so the input is chunked rather than truncated.
  */
 export class FcmAdapter implements PushPort {
   private readonly logger = new Logger(FcmAdapter.name);
@@ -27,8 +26,8 @@ export class FcmAdapter implements PushPort {
       credential: cert({
         projectId,
         clientEmail,
-        // A private key in an env var arrives with literal backslash-n sequences;
-        // the SDK needs real newlines or it fails to parse the PEM.
+        // A private key in an env var arrives with literal backslash-n sequences; the SDK
+        // needs real newlines or it fails to parse the PEM.
         privateKey: privateKey.replace(/\\n/g, '\n'),
       }),
     });
@@ -39,8 +38,8 @@ export class FcmAdapter implements PushPort {
     for (const batch of chunk(messages, 500)) {
       if (batch.length === 0) continue;
       const first = batch[0]!;
-      // sendEachForMulticast returns one result per token, in order, which is what
-      // makes it possible to attribute a failure back to a specific install.
+      // sendEachForMulticast returns one result per token, in order, which is what makes it
+      // possible to attribute a failure back to a specific install.
       const response = await this.messaging!.sendEachForMulticast({
         tokens: batch.map((m) => m.token),
         notification: { title: first.title, body: first.body },
@@ -50,8 +49,8 @@ export class FcmAdapter implements PushPort {
       response.responses.forEach((result, index) => {
         if (result.success) return;
         const code = result.error?.code ?? 'unknown';
-        // sendEachForMulticast returns one response per token, so a short array
-        // would mean the SDK and our input disagree. Skip rather than guess.
+        // One response per token, so a short array would mean the SDK and our input disagree.
+        // Skip rather than guess.
         const token = batch[index]?.token;
         if (token === undefined) return;
 
@@ -61,8 +60,8 @@ export class FcmAdapter implements PushPort {
           this.logger.warn('fcm.token_rejected', { code, tokenPrefix: token.slice(0, 12) });
           void this.revokeToken(token).catch(() => undefined);
         } else {
-          // Transient (rate limit, internal error). Throwing lets BullMQ retry the
-          // job, and the dedupe record keeps the retry to one visible notification.
+          // Transient (rate limit, internal error). Throwing lets BullMQ retry, and the dedupe
+          // record keeps the retry to one visible notification.
           this.logger.warn('fcm.transient_failure', { code });
           throw new Error(`FCM transient failure: ${code}`);
         }

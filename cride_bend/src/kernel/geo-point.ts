@@ -40,10 +40,8 @@ export function distanceMetres(a: GeoPoint, b: GeoPoint): number {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-/**
- * Done once at the mapper boundary, so the cache key and the database row cannot
- * disagree.
- */
+/** Applied once, at the mapper boundary, so the cache key and the database row cannot
+ *  disagree. */
 export function round(p: GeoPoint): GeoPoint {
   return {
     lat: Number(p.lat.toFixed(PRECISION)),

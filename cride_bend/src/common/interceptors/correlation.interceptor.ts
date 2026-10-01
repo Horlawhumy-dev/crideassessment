@@ -2,10 +2,7 @@ import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nes
 import { Response } from 'express';
 import { CORRELATION_HEADER, resolveCorrelationId } from '../../kernel/correlation-id';
 
-/**
- * Runs first in the chain, so downstream logs, spans, events, outbox rows and jobs
- * all join on one identifier.
- */
+/** Runs first in the chain, so logs, spans, events, outbox rows and jobs join on one id. */
 @Injectable()
 export class CorrelationInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler) {

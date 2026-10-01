@@ -2,8 +2,7 @@ import { add, compare, fromJSON, isZero, money, multiply, toJSON, ZERO } from '.
 
 describe('money', () => {
   it('stores minor units exactly, with no float involved', () => {
-    // 0.1 + 0.2 !== 0.3 in binary floating point; minor units sidestep that class
-    // of rounding bug.
+    // 0.1 + 0.2 !== 0.3 in binary floating point; minor units sidestep that class of bug.
     expect(money('3450').amountMinor).toBe(3450n);
     expect(add(money(10), money(20)).amountMinor).toBe(30n);
   });

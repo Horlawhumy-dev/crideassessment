@@ -3,15 +3,11 @@ import type { Redis } from 'ioredis';
 import { RedisClient } from '../cache/redis.client';
 import { EVENT_BUS, type EventBus } from './event-bus.port';
 
-/**
- * Pub/sub rather than a list or a stream: these are live state notifications whose
- * authoritative copy is PostgreSQL, so a subscriber that missed one resyncs from the `seq`
- * gap check rather than replaying a backlog nobody asked for.
- *
- * The subscriber connection is separate from the command client because a subscribed
- * ioredis connection cannot issue commands, and that client also serves the ride cache and
- * the location rate limiter.
- */
+/** Pub/sub rather than a list or a stream: PostgreSQL is the authoritative copy, so a
+ * subscriber that missed one resyncs from the `seq` gap check rather than replaying a
+ * backlog nobody asked for. The subscriber connection is separate because a subscribed
+ * ioredis connection cannot issue commands, and this client also serves the ride cache
+ * and the location rate limiter. */
 @Injectable()
 export class RedisEventBus implements EventBus, OnApplicationShutdown {
   private readonly logger = new Logger(RedisEventBus.name);
@@ -30,8 +26,8 @@ export class RedisEventBus implements EventBus, OnApplicationShutdown {
     set.add(handler);
     this.handlers.set(topic, set);
 
-    // Re-issuing SUBSCRIBE for an already-subscribed channel is a no-op in Redis,
-    // so this is safe on every new topic and needs no tracking of covered channels.
+    // Re-issuing SUBSCRIBE for an already-subscribed channel is a no-op in Redis, so
+    // this is safe on every new topic and needs no tracking of covered channels.
     void this.ensureSubscribed();
 
     return () => {
@@ -43,9 +39,8 @@ export class RedisEventBus implements EventBus, OnApplicationShutdown {
     if (this.subscribing) return this.subscribing;
 
     this.subscribing = (async () => {
-      // duplicateForPubSub: this subscribe is issued while the connection is still
-      // handshaking, and `enableOfflineQueue: false` would reject it. See
-      // RedisClient#duplicateForPubSub.
+      // `duplicateForPubSub`: this subscribe is issued while the connection is still
+      // handshaking, and `enableOfflineQueue: false` would reject it.
       const sub = this.redis.duplicateForPubSub();
       this.subscriber = sub;
 
@@ -67,8 +62,8 @@ export class RedisEventBus implements EventBus, OnApplicationShutdown {
           try {
             handler(parsed);
           } catch (err) {
-            // One faulty handler must not stop delivery to the others — a throwing
-            // subscriber would otherwise silently drop every later event.
+            // One faulty handler must not stop delivery to the others; a throwing
+            // subscriber would silently drop every later event.
             this.logger.error('event_bus.handler_failed', { channel, err: String(err) });
           }
         }
@@ -76,7 +71,7 @@ export class RedisEventBus implements EventBus, OnApplicationShutdown {
 
       await sub.subscribe(...this.handlers.keys());
     })().catch((err: unknown) => {
-      // Allow a later call to retry rather than leaving the bus permanently dead.
+      // Cleared so a later call retries instead of leaving the bus permanently dead.
       this.subscribing = null;
       this.logger.error('event_bus.subscribe_failed', { err: String(err) });
     });

@@ -9,9 +9,9 @@ export interface AvailabilityView {
 }
 
 /**
- * Availability is a driver-only fact, so the policy is applied here rather than in the
- * controller. It is persisted, not just socket state: the durable value is what the UI
- * renders after a reload, and `drivers:available` room membership is derived from it.
+ * Policy is applied here, not the controller: availability is a driver-only fact. It is
+ * persisted rather than socket-only because the durable value is what the UI renders
+ * after a reload, and `drivers:available` room membership derives from it.
  */
 @Injectable()
 export class DriverAvailabilityService {

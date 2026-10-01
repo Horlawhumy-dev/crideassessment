@@ -45,9 +45,9 @@ describe('ride state machine', () => {
   });
 
   describe('the full matrix', () => {
-    // Two independent questions: `canTransition` asks whether the edge exists;
-    // `assertTransition` asks whether this actor may drive it. ACCEPTED -> CANCELLED
-    // is legal but rider-forbidden, so the table test below sees it as permitted.
+    // Two independent questions: `canTransition` asks whether the edge exists,
+    // `assertTransition` whether this actor may drive it. ACCEPTED -> CANCELLED is legal
+    // but rider-forbidden, so the table test below sees it as permitted.
     for (const from of RIDE_STATUSES) {
       for (const to of RIDE_STATUSES) {
         const edgeExists = RIDE_TRANSITIONS[from].includes(to);
@@ -129,8 +129,8 @@ describe('ride state machine', () => {
     });
 
     it('lets exactly one role drive each status, except CANCELLED', () => {
-      // CANCELLED is the only two-actor target; every other has one owner, which
-      // keeps a wrong actor a 403 rather than an ambiguous 409.
+      // CANCELLED is the only two-actor target; every other has one owner, which keeps a
+      // wrong actor a 403 rather than an ambiguous 409.
       for (const status of RIDE_STATUSES) {
         const actors = TRANSITION_ACTOR[status];
         if (status === 'CANCELLED') {

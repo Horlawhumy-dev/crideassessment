@@ -38,6 +38,33 @@ function SessionGate({ children }: { children: React.ReactNode }) {
     );
   }
 
+  /**
+   * `/auth/me` failed in a way that does not mean "signed out" — a 5xx, a dropped
+   * connection, a DNS failure. Rendering the signed-out tree here would sign the
+   * user out of a session that is still valid and bounce them to the sign-in form
+   * because the network blipped, so this says what actually happened and offers
+   * the one action that can fix it.
+   */
+  if (session.isUnresolved) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center px-6">
+        <div className="flex max-w-sm flex-col items-center gap-4 text-center">
+          <h1 className="text-base font-semibold">Cannot reach C-Ride</h1>
+          <p className="text-muted-foreground text-sm">
+            We could not check whether you are signed in. This is usually temporary.
+          </p>
+          <button
+            type="button"
+            onClick={() => void session.refetch()}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg px-4 py-2 text-sm font-medium"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!session.isAuthenticated || !session.user || !session.role) {
     // Signed out: the socket must not be opened, but the query client and toaster
     // still have to exist, because the sign-in form uses a mutation.

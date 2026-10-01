@@ -8,7 +8,7 @@ const csv = z
 
 /**
  * NOT z.coerce.boolean(): `Boolean("false")` is true, so coercion inverts the flag —
- * `FCM_ENABLED=false` would enable Firebase and then fail the credential check.
+ * `FCM_ENABLED=false` would enable Firebase, then fail the credential check.
  */
 const bool = (defaultValue: boolean) =>
   z
@@ -49,9 +49,8 @@ const baseSchema = z.object({
   RIDE_CACHE_TTL_SECONDS: z.coerce.number().int().default(30),
   RIDE_OFFER_TTL_MINUTES: z.coerce.number().int().default(10),
   /**
-   * Tunable in both directions: an operator may want it tighter than the offer
-   * window, and test/fixtures/env-e2e.ts pushes it out of range so no background
-   * sweep cancels the deliberately-stale rides a suite constructs.
+   * Tunable both ways: an operator may want it tighter than the offer window, and
+   * test/fixtures/env-e2e.ts pushes it out of range so no sweep cancels stale rides.
    */
   RIDE_EXPIRY_SWEEP_INTERVAL_MS: z.coerce.number().int().min(1_000).default(60_000),
   LOCATION_TTL_SECONDS: z.coerce.number().int().default(90),
@@ -71,8 +70,8 @@ const baseSchema = z.object({
   REQUEST_TIMEOUT_MS: z.coerce.number().int().default(8000),
 
   /**
-   * Minor units (kobo, pence), never floats: `Money` is a bigint of minor units end
-   * to end. The defaults are the NGN table; FARE_CURRENCY travels with every fare.
+   * Minor units (kobo, pence), never floats: `Money` is a bigint of minor units end to
+   * end. Defaults are the NGN table; FARE_CURRENCY travels with every fare.
    */
   FARE_CURRENCY: z.string().length(3).default('NGN'),
   FARE_BASE_MINOR: z.coerce.number().int().min(0).default(1_000),
@@ -117,8 +116,7 @@ export const configSchema = baseSchema
       });
     }
 
-    // The .env.example values are refused in production: a leaked secret should
-    // fail at boot, not be discovered later.
+    // The example values are refused in production: a leaked secret fails at boot.
     if (cfg.NODE_ENV === 'production') {
       if (cfg.JWT_SECRET.startsWith('dev-only')) {
         ctx.addIssue({

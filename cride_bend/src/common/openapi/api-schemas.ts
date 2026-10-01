@@ -4,9 +4,8 @@ import { RIDE_STATUSES } from '../../rides/domain/ride-status';
 import { IN_APP_NOTIFICATION_KINDS } from '../../notifications/kinds';
 
 /**
- * Request schemas are derived from the Zod schemas that validate them (see
- * zod-to-openapi.ts) and cannot drift. Responses have no such source, so they are
- * declared here and checked against a running app by test/e2e/openapi.spec.ts.
+ * Request schemas derive from the Zod schemas that validate them (see zod-to-openapi.ts).
+ * Responses have no such source, so they are declared here.
  */
 
 /** BigInt becomes a string at exactly one place, and this is its type. */
@@ -49,8 +48,8 @@ export class RideResponseDto {
 
   @ApiProperty({
     // `type: String` is required alongside nullable: `format: 'uuid'` alone emits no
-    // type, which openapi-typescript renders as `Record<string, never>` — and a
-    // string is not assignable to that.
+    // type, which openapi-typescript renders as `Record<string, never>` — and a string
+    // is not assignable to that.
     type: String,
     format: 'uuid',
     nullable: true,
@@ -153,8 +152,7 @@ export class RideListResponseDto {
 
 /**
  * `readAt` rather than a boolean `read`: the two cannot disagree, and the timestamp
- * renders "read 2 minutes ago" for free. `dedupeKey` and `userId` are absent on
- * purpose — the first is an internal idempotency token, the second the caller's own id.
+ * renders "read 2 minutes ago" free. `dedupeKey` and `userId` are absent on purpose.
  */
 export class InAppNotificationDto {
   @ApiProperty({ format: 'uuid' })

@@ -2,10 +2,7 @@ import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nes
 import { Observable, tap } from 'rxjs';
 import { LoggerService } from '../../platform/otel/logger';
 
-/**
- * Allowlist rather than a redaction denylist: a denylist silently starts leaking
- * as the code grows new fields.
- */
+/** Allowlist, not a redaction denylist: a denylist silently starts leaking as fields are added. */
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
   constructor(private readonly logger: LoggerService) {}

@@ -7,16 +7,11 @@ import { DriverOfferHandler } from './outbox.handlers/driver-offer.handler';
 import { RouteRecorderHandler } from './outbox.handlers/route-recorder.handler';
 import type { OutboxPublisher } from './outbox.publisher';
 
-/**
- * `OutboxRelay.register()` is a plain method call that nothing in Nest's DI graph makes,
- * so without this the relay boots with an empty publisher set, finds no interested
- * handlers, and marks every message PUBLISHED — a silent, permanent drop that looks
- * exactly like success.
- *
- * `onModuleInit` rather than `onApplicationBootstrap`: the relay starts polling in
- * `onApplicationBootstrap`, which Nest runs *after* every `onModuleInit`. Registering in
- * the earlier hook means the first poll always sees a complete set.
- */
+/** `OutboxRelay.register()` is a plain method call nothing in Nest's DI graph makes, so
+ * without this the relay boots with an empty publisher set and marks every message
+ * PUBLISHED — a silent, permanent drop that looks exactly like success.
+ * `onModuleInit`, not `onApplicationBootstrap`: the relay starts polling in the latter, which
+ * Nest runs *after* every `onModuleInit`, so the first poll always sees a complete set. */
 @Injectable()
 export class OutboxRegistrar implements OnModuleInit {
   private readonly logger = new Logger(OutboxRegistrar.name);

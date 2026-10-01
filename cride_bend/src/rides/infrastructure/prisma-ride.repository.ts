@@ -84,11 +84,9 @@ export class PrismaRideRepository implements RideRepository {
     }));
   }
 
-  /**
-   * Guard and write in one statement. `driverId: null` is not redundant with
-   * `status = REQUESTED`: it makes a partially-written accept impossible to win
-   * again, and `version` is the second line of defence against a concurrent write.
-   */
+  /** Guard and write in one statement. `driverId: null` is not redundant with
+   *  `status = REQUESTED`: it stops a partially-written accept winning again, and
+   *  `version` is the second line of defence. */
   async acceptIfRequested(
     tx: TransactionContext,
     rideId: string,
@@ -109,10 +107,8 @@ export class PrismaRideRepository implements RideRepository {
     return result.count === 1;
   }
 
-  /**
-   * Optimistic concurrency. `driverId` is in the predicate, not just the data, so a
-   * write cannot land on a ride whose driver changed between read and write.
-   */
+  /** Optimistic concurrency. `driverId` is in the predicate, not just the data, so a write
+   *  cannot land on a ride whose driver changed between read and write. */
   async transitionWithVersion(
     tx: TransactionContext,
     rideId: string,
@@ -144,8 +140,8 @@ export class PrismaRideRepository implements RideRepository {
         id: input.id,
         riderId: input.riderId,
         status: 'REQUESTED',
-        // Matches the schema default, set explicitly so the first optimistic update
-        // is written against a known value.
+        // Matches the schema default; set explicitly so the first optimistic update
+        // has a known value to compare against.
         version: 1,
         pickupLat: input.pickup.lat,
         pickupLng: input.pickup.lng,

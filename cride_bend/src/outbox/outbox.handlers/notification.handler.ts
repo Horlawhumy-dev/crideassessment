@@ -19,9 +19,9 @@ export class NotificationHandler implements OutboxPublisher {
     // Who to tell is `recipientsFor`'s decision, shared with the inbox write.
     const recipients = recipientsFor(eventType, payload).map((r) => r.userId);
 
-    // Idempotency key. Underscore separators: BullMQ rejects a custom jobId containing
-    // ':' — see QueueProducer.send. It must be a pure function of (ride, seq, recipients)
-    // so two relay attempts collide and dedupe, while distinct notifications do not.
+    // Idempotency key. Underscore separators: BullMQ rejects a custom jobId containing ':'
+    // — see QueueProducer.send. A pure function of (ride, seq, recipients) so two relay
+    // attempts collide and dedupe while distinct notifications do not.
     const jobId = `notif_${aggregateId}_${seq ?? 0}_${[...recipients].sort().join(',')}`;
 
     await this.producer.enqueueNotifications(

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api/client';
@@ -38,9 +38,26 @@ export function useRideTransitions() {
   const { state, adoptRide } = useRideState();
   const [busy, setBusy] = useState(false);
 
+  /**
+   * The in-flight guard is a ref, not the `busy` state.
+   *
+   * `busy` is one render behind by construction: `setBusy(true)` does not
+   * re-render, so a second click inside the same tick still reads `busy === false`
+   * from the captured closure and both requests go out. On one offer row that is
+   * two `PATCH /rides/:id/accept` calls; since this hook is mounted per row on the
+   * driver screen, two different rows can double-submit independently. The server
+   * rejects the loser with a 409, so nothing corrupts — but the user sees a toast
+   * about a conflict they caused, which is worse than the debounce it looks like.
+   *
+   * A ref is checked and set synchronously, so the second call in the same tick
+   * sees the first. `busy` state is kept for rendering only.
+   */
+  const inFlight = useRef(false);
+
   const execute = useCallback(
     async (ride: Ride, attempt: () => Promise<Ride>): Promise<boolean> => {
-      if (busy) return false;
+      if (inFlight.current) return false;
+      inFlight.current = true;
       setBusy(true);
 
       try {
@@ -50,13 +67,14 @@ export function useRideTransitions() {
         handleFailure(error, ride.id, adoptRide);
         return false;
       } finally {
-        // `finally`, not the success path. A failure that leaves `busy` set is
+        // `finally`, not the success path. A failure that leaves the guard set is
         // the button that says "Working…" forever, which is exactly the bug in
         // the old DriverDashboard.
+        inFlight.current = false;
         setBusy(false);
       }
     },
-    [adoptRide, busy],
+    [adoptRide],
   );
 
   const run = useCallback(

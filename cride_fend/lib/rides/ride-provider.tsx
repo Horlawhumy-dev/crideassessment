@@ -116,11 +116,24 @@ export function RideProvider({ role, userId, children }: { role: UserRole; userI
 
   /** The ride the socket is currently subscribed to. Ref, not state: re-subscribing is an effect. */
   const subscribedRideId = useRef<string | null>(null);
-  /** Suppresses a refetch storm when many frames arrive at once. */
+  /**
+   * Suppresses a refetch storm when many frames arrive at once.
+   *
+   * `refetchQueued` is what makes that suppression safe. Dropping the *call* when
+   * one is already running is only correct if something re-runs it afterwards —
+   * otherwise the frames that arrived mid-flight are the ones that never reach the
+   * server, and the client keeps a stale ride until some unrelated event rescues
+   * it. This flag is the trailing edge: the last caller of a coalesced burst
+   * gets exactly one more refetch, which observes the final state.
+   */
   const refetchInFlight = useRef(false);
+  const refetchQueued = useRef(false);
 
   const refetchActiveRide = useCallback(async () => {
-    if (refetchInFlight.current) return;
+    if (refetchInFlight.current) {
+      refetchQueued.current = true;
+      return;
+    }
     refetchInFlight.current = true;
     try {
       // `GET /rides/{id}` is the authority. A frame said something changed; this
@@ -152,6 +165,12 @@ export function RideProvider({ role, userId, children }: { role: UserRole; userI
       setError(cause instanceof ApiError ? cause.displayMessage : 'Could not reach C-Ride.');
     } finally {
       refetchInFlight.current = false;
+      // The trailing edge. Cleared before the call so the retry is not coalesced
+      // into another queue entry, and re-entrant only through this flag.
+      if (refetchQueued.current) {
+        refetchQueued.current = false;
+        void refetchActiveRide();
+      }
     }
   }, [queryClient]);
 
@@ -267,24 +286,36 @@ export function RideProvider({ role, userId, children }: { role: UserRole; userI
     };
 
     // Registered by the names the gateway and RealtimeHandler actually use.
-    active.on(OUTBOUND.locationUpdate, (p: DriverLocation) =>
-      handle(OUTBOUND.locationUpdate, { rideId: p.rideId, location: p }),
-    );
-    active.on(OUTBOUND.statusChanged, (p: StatusFrame) => handle(OUTBOUND.statusChanged, p, true));
-    active.on(OUTBOUND.assigned, (p: StatusFrame) => handle(OUTBOUND.assigned, p, true));
-    active.on(OUTBOUND.released, (p: StatusFrame) => handle(OUTBOUND.released, p, true));
-    active.on(OUTBOUND.offer, (p: StatusFrame) => handle(OUTBOUND.offer, p));
-    active.on(OUTBOUND.error, (p: { message?: string }) => {
+    //
+    // The handler references are kept, because `off(event)` with no handler is not
+    // "remove the listener" — it removes *every* listener for that event, including
+    // ones another consumer registered. This effect re-runs whenever `queryClient`
+    // or a callback identity changes, so the bare form was removing the whole
+    // subscription set on each re-run and the ride could silently stop updating.
+    const onLocation = (p: DriverLocation) =>
+      handle(OUTBOUND.locationUpdate, { rideId: p.rideId, location: p });
+    const onStatusChanged = (p: StatusFrame) => handle(OUTBOUND.statusChanged, p, true);
+    const onAssigned = (p: StatusFrame) => handle(OUTBOUND.assigned, p, true);
+    const onReleased = (p: StatusFrame) => handle(OUTBOUND.released, p, true);
+    const onOffer = (p: StatusFrame) => handle(OUTBOUND.offer, p);
+    const onSocketError = (p: { message?: string }) => {
       setError(p?.message ?? 'The connection reported a problem.');
-    });
+    };
+
+    active.on(OUTBOUND.locationUpdate, onLocation);
+    active.on(OUTBOUND.statusChanged, onStatusChanged);
+    active.on(OUTBOUND.assigned, onAssigned);
+    active.on(OUTBOUND.released, onReleased);
+    active.on(OUTBOUND.offer, onOffer);
+    active.on(OUTBOUND.error, onSocketError);
 
     return () => {
-      active.off(OUTBOUND.locationUpdate);
-      active.off(OUTBOUND.statusChanged);
-      active.off(OUTBOUND.assigned);
-      active.off(OUTBOUND.released);
-      active.off(OUTBOUND.offer);
-      active.off(OUTBOUND.error);
+      active.off(OUTBOUND.locationUpdate, onLocation);
+      active.off(OUTBOUND.statusChanged, onStatusChanged);
+      active.off(OUTBOUND.assigned, onAssigned);
+      active.off(OUTBOUND.released, onReleased);
+      active.off(OUTBOUND.offer, onOffer);
+      active.off(OUTBOUND.error, onSocketError);
     };
   }, [queryClient, refetchActiveRide, requestSync]);
 
@@ -397,6 +428,46 @@ export function RideProvider({ role, userId, children }: { role: UserRole; userI
   }, []);
 
   const clearError = useCallback(() => setError(null), []);
+
+  /**
+   * A finished ride stops being the active ride.
+   *
+   * Without this the terminal state is permanent: both home screens compute
+   * `activeRide = state.active ?? serverRide`, so once a ride reached COMPLETED or
+   * CANCELLED it stayed in `state.active` for the life of the tab. A rider's
+   * request panel never came back and their next trip was unreachable; a driver
+   * never saw the offer queue again. `dismissRide` existed for exactly this and
+   * had no callers, which is why the bug survived — nothing failed, the ride just
+   * never left.
+   *
+   * The delay is deliberate. Dumping the card the instant the status flips would
+   * replace "Trip finished. Thanks for riding" with an empty screen and no
+   * explanation, so the terminal state is shown briefly and then released.
+   */
+  const terminalTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const TERMINAL_GRACE_MS = 6000;
+
+  useEffect(() => {
+    if (!state.active || !isTerminal(state.active.status)) return;
+
+    const terminalRideId = state.active.id;
+    terminalTimer.current = setTimeout(() => {
+      // Only if it is still the same ride and still terminal: a new ride adopted
+      // during the grace period must not be cleared by a timer set for the old one.
+      const current = stateRef.current.active;
+      if (!current || current.id !== terminalRideId || !isTerminal(current.status)) return;
+
+      leaveRide(terminalRideId);
+      if (subscribedRideId.current === terminalRideId) subscribedRideId.current = null;
+      dispatch({ type: 'clear' });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.ride.list({}) });
+    }, TERMINAL_GRACE_MS);
+
+    return () => {
+      if (terminalTimer.current) clearTimeout(terminalTimer.current);
+      terminalTimer.current = null;
+    };
+  }, [state.active, queryClient]);
 
   const value = useMemo<RideContextValue>(
     () => ({

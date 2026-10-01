@@ -12,8 +12,8 @@ interface HealthReport {
   checks: Record<string, 'up' | 'down' | 'degraded'>;
 }
 
-/** Postgres is a hard dependency; Redis reports 'degraded' rather than failing. A health
- * check that failed on a degraded cache would take the service out of rotation for a
+/** Postgres is a hard dependency; Redis reports 'degraded' rather than failing, because a
+ * health check that failed on a degraded cache would take the service out of rotation for a
  * non-existent problem. */
 @ApiTags('health')
 @Controller('health')

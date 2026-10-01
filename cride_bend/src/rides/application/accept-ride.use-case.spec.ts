@@ -21,10 +21,8 @@ import {
   immediateTransaction,
 } from '../../test/fakes';
 
-/**
- * §4.5.2 — the claim under test: two drivers accepting the same ride, exactly one
- * wins, and the loser gets a *specific* error rather than a generic 409.
- */
+/** Two drivers accepting the same ride: exactly one wins, and the loser gets a *specific*
+ *  error rather than a generic 409. */
 const DRIVER_A: Principal = { userId: 'driver-a', role: 'DRIVER', sessionId: 'sa' };
 const DRIVER_B: Principal = { userId: 'driver-b', role: 'DRIVER', sessionId: 'sb' };
 const RIDER: Principal = { userId: 'rider-1', role: 'RIDER', sessionId: 'sr' };
@@ -73,8 +71,8 @@ describe('AcceptRideUseCase', () => {
   });
 
   it('gives the event and the outbox row the same seq', async () => {
-    // If these disagree, the client's gap detection (§4.8.3) sees a permanent
-    // hole and resyncs on every single event.
+    // If these disagree, the client's gap detection sees a permanent hole and it
+    // resyncs on every single event.
     const { useCase, outbox, events } = build(aRide());
     await useCase.execute(DRIVER_A, 'ride-1', 'corr-1');
 
@@ -103,8 +101,7 @@ describe('AcceptRideUseCase', () => {
   });
 
   it('tells the loser the ride was already taken', async () => {
-    // Three different situations get three different codes so the frontend can
-    // say three different things.
+    // Three situations get three codes so the frontend can say three things.
     const { useCase } = build(aRide());
     await useCase.execute(DRIVER_A, 'ride-1', 'corr-a');
 
@@ -142,14 +139,13 @@ describe('AcceptRideUseCase', () => {
 
     await expect(useCase.execute(DRIVER_B, 'ride-1', 'corr-b')).rejects.toThrow();
 
-    // One row, not two. Emitting before discovering the loss would notify a driver
+    // One row, not two: emitting before discovering the loss would notify a driver
     // about a ride they do not have.
     expect(outbox.events).toHaveLength(1);
   });
 
   it('still succeeds when the cache is unavailable', async () => {
-    // P6: a Redis outage must not become a ride outage. The cache is a
-    // performance concern and is explicitly allowed to fail.
+    // A Redis outage must not become a ride outage; the cache may fail.
     const { useCase, cache } = build(aRide());
     cache.setFailing(true);
 

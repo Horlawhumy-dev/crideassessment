@@ -5,7 +5,8 @@ import { MetricsService } from '../otel/metrics';
 import { QUEUE_RIDE_NOTIFICATIONS, QUEUE_RIDE_MATCHING, type QueueName } from './queues';
 
 export interface EnqueueOptions {
-  /** Stable key so a duplicate enqueue is a no-op rather than a second delivery. */
+  /** Stable key so a duplicate enqueue is a no-op rather than a second delivery.
+   * Must use `_`, never `:` — see `send`. */
   jobId?: string;
   delayMs?: number;
 }
@@ -40,9 +41,9 @@ export class QueueProducer {
   }
 
   /**
-   * Rejects rather than swallowing: `OutboxRelay.dispatch` picks between PUBLISHED and
-   * retry purely on whether the handler rejected, so a swallowed error reads as success,
-   * the row is marked PUBLISHED, and the retry ladder and dead-letter state are unreachable.
+   * Rejects rather than swallowing: `OutboxRelay.dispatch` picks between PUBLISHED and retry
+   * purely on whether the handler rejected, so a swallowed error reads as success, the row is
+   * marked PUBLISHED, and the retry ladder and dead-letter state are unreachable.
    */
   private async send(
     queue: Queue,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 
 import { useSession } from '@/lib/session/session';
 import type { UserRole } from '@/lib/types';
@@ -32,22 +32,39 @@ export function RequireRole({
 }) {
   const router = useRouter();
   const session = useSession();
-  const permitted = allowed ?? (role ? ([role] as readonly UserRole[]) : null);
+
+  /**
+   * The allowed set is the same value on every render, so this does not re-fire.
+   *
+   * It was previously `allowed ?? [role]` computed inline, which allocates a fresh
+   * array each render — and `permitted` is in the effect's dependency list. A new
+   * array identity on every render meant the effect ran on every render, and for a
+   * signed-out visitor `router.replace('/signin')` fired each time. That is a
+   * redirect loop the router only tolerates because the second navigation lands on
+   * a different route; it burns history entries and makes the guard's behaviour
+   * depend on navigation timing.
+   */
+  const permitted = useMemo<readonly UserRole[] | null>(
+    () => allowed ?? (role ? [role] : null),
+    [allowed, role],
+  );
+
+  const roleIsPermitted = permitted ? permitted.includes(session.role as UserRole) : true;
 
   useEffect(() => {
-    if (session.isLoading) return;
+    if (session.isLoading || session.isUnresolved) return;
 
     if (!session.isAuthenticated) {
       router.replace('/signin');
       return;
     }
 
-    if (permitted && !permitted.includes(session.role as UserRole)) {
+    if (permitted && !roleIsPermitted) {
       router.replace(session.role === 'DRIVER' ? '/driver' : '/rider');
     }
-  }, [router, permitted, session.isLoading, session.isAuthenticated, session.role]);
+  }, [router, permitted, roleIsPermitted, session.isLoading, session.isUnresolved, session.isAuthenticated, session.role]);
 
-  const allowedHere = session.isAuthenticated && (!permitted || permitted.includes(session.role as UserRole));
+  const allowedHere = session.isAuthenticated && roleIsPermitted;
 
   if (session.isLoading || !allowedHere) {
     return (

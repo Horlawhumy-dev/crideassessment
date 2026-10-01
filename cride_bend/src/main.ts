@@ -12,12 +12,18 @@ import { RedisClient } from './platform/cache/redis.client';
 import { RedisIoAdapter } from './platform/realtime/redis-io.adapter';
 import { servesHttp } from './config/app-role';
 import { buildOpenApiDocument } from './common/openapi/build-openapi-document';
+import { LoggerService } from './platform/otel/logger';
 
 async function main(): Promise<void> {
-  const app = await NestFactory.create(AppModule, { bufferLogs: false });
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
   const config = app.get(ConfigService).get<AppConfig>(APP_CONFIG)!;
 
-  // Credentials must be allowed for the httpOnly session cookie to be sent (§4.12.4).
+  // Without this the structured logger is only reached by the interceptors, so framework
+  // and application logs arrive in two formats on the same stream and half cannot be joined
+  // to a trace. `bufferLogs: true` defers emissions until here, so nothing is lost.
+  app.useLogger(app.get(LoggerService));
+
+  // Credentials must be allowed for the httpOnly session cookie to be sent.
   // The wildcard is rejected at boot by env.schema.ts in production.
   app.enableCors({
     origin: config.corsOrigins,
@@ -27,17 +33,15 @@ async function main(): Promise<void> {
 
   app.use(cookieParser());
 
-  // Must be installed before listen(): the adapter has to exist when the io server
-  // is constructed, not after. Without it, rooms are per-replica and a ride event
-  // reaches only the clients attached to the replica that published it.
+  // MUST be installed before listen(): the adapter has to exist when the io server is
+  // constructed and cannot be set afterwards. Without it rooms are per-replica and a ride
+  // event reaches only the clients on the replica that published it.
   app.useWebSocketAdapter(new RedisIoAdapter(app, app.get(RedisClient)));
 
-  // No global ValidationPipe. Every route declares its own ZodValidationPipe, and
-  // a global class-validator pipe would be a second, silently-unused validation
-  // path: `whitelist` strips unknown keys on the *validated* object while Zod's
-  // default strip behaviour decides what actually reaches the use-case, so the two
-  // would disagree about which properties exist. One validator per route, and it
-  // is the one whose schema is the source of truth for that route.
+  // No global ValidationPipe. Every route declares its own ZodValidationPipe, and a global
+  // class-validator pipe would be a second, silently-unused path that disagrees with Zod
+  // about which properties exist. One validator per route, and its schema is the source
+  // of truth for that route.
   app.enableShutdownHooks();
 
   SwaggerModule.setup('docs', app, buildOpenApiDocument(app));

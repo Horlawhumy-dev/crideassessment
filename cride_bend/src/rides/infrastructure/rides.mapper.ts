@@ -4,7 +4,6 @@ import type { RideStatus } from '../domain/ride-status';
 import { money, fromJSON, type Money } from '../../kernel/money';
 import { round, type GeoPoint } from '../../kernel/geo-point';
 
-/** The only place BigInt becomes a string; JSON.stringify throws on it. */
 export function toDomain(row: RideRow & { rider?: User; driver?: User | null }): Ride {
   return {
     id: row.id,
@@ -58,10 +57,8 @@ export function toJSONMoney(m: Money) {
   return { amountMinor: m.amountMinor.toString(), currency: m.currency };
 }
 
-/**
- * Wire projection for one audit event. `createdAt` becomes an ISO string here so
- * the wire contract does not depend on the transport.
- */
+/** Wire projection for one audit event. `createdAt` becomes an ISO string here so the wire
+ *  contract does not depend on the transport. */
 export function toWireEvent(event: RideEvent) {
   return {
     id: event.id,

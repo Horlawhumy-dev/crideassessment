@@ -4,9 +4,8 @@ import { RedisEventBus } from './redis-event-bus';
 import { EgressGuard } from './egress-guard';
 
 /** Global: the outbox relay publishes and the ride gateways subscribe, and neither should
- * know the other exists. `EgressGuard` is exported for the same reason — both realtime
- * subscribers re-emit into a room, which the adapter fans back out to every node, so
- * without it one client-visible event arrives once per instance. */
+ * know the other exists. Both subscribers re-emit into a room, which the adapter fans back
+ * to every node, so they need `EgressGuard` to avoid one client-visible event per instance. */
 @Global()
 @Module({
   providers: [RedisEventBus, EgressGuard, { provide: EVENT_BUS, useExisting: RedisEventBus }],

@@ -24,7 +24,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
       useFactory: (config: ConfigService) => ({
         secret: config.get<AppConfig>(APP_CONFIG)!.JWT_SECRET,
         // Pinned: verifying with a different algorithm than signing is how alg-confusion
-        // (RS256/HS256, "alg: none") bypasses get in.
+        // (RS256/HS256, `alg: none`) bypasses get in.
         signOptions: { algorithm: 'HS256' },
       }),
     }),

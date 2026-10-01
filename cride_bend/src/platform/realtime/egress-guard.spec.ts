@@ -2,7 +2,7 @@ import { EgressGuard } from './egress-guard';
 import { RedisClient } from '../cache/redis.client';
 
 /** Models only what the guard relies on: an atomic `SET key val PX ttl NX`. A fake that
- * resolved the winner and the loser the same way would pass the guard while defeating it. */
+ * resolved winner and loser the same way would pass the guard while defeating it. */
 class FakeRedis {
   keys = new Map<string, string>();
   calls: unknown[][] = [];
@@ -49,8 +49,8 @@ describe('EgressGuard', () => {
     expect(value).toBe('1');
     expect(px).toBe('PX');
     expect(nx).toBe('NX');
-    // The claim only has to outlast the pub/sub fan-out; a long TTL would start eating
-    // the relay's retries, which re-drive the same event id.
+    // Must outlast the pub/sub fan-out only; a long TTL would eat the relay's retries,
+    // which re-drive the same event id.
     expect(ttl).toBeLessThanOrEqual(10_000);
   });
 

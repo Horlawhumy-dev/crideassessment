@@ -11,7 +11,7 @@
  * Checked in CI:        npm run check:api
  */
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -64,15 +64,22 @@ async function check() {
   process.stdout.write('Contract is in sync with the running API.\n');
 }
 
-const mode = process.argv[2];
-
-if (mode === 'check') {
-  await check();
-} else {
-  await mkdir(dirname(OUT), { recursive: true }).catch(() => {});
-  await generate();
-}
-
-// Kept so the module is not flagged as side-effect-only for `--check` runs.
 export { generate, check };
-void writeFile;
+
+/**
+ * Dispatch only when run directly, never on import.
+ *
+ * This used to be top-level and unconditional on argv, so `import ... from
+ * './generate-api-types.mjs'` overwrote lib/generated/api.d.ts as a side effect
+ * of importing it — which is how the check script came to regenerate instead of
+ * check. `check-api-contract.mjs` imports `check` from here; importing must be
+ * inert.
+ */
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if (process.argv[2] === 'check') {
+    await check();
+  } else {
+    await mkdir(dirname(OUT), { recursive: true }).catch(() => {});
+    await generate();
+  }
+}

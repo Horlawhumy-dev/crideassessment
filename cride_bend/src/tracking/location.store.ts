@@ -11,10 +11,7 @@ export interface DriverLocation {
   readonly recordedAt: Date;
 }
 
-/**
- * Separate from rides because the characteristics differ — per-second writes, ~60 s
- * retention, loss tolerance. Nothing here writes to PostgreSQL.
- */
+/** Separate from rides: per-second writes, ~60 s retention, loss tolerance. Nothing here writes PostgreSQL. */
 export interface LocationStore {
   put(rideId: string, location: DriverLocation, ttlSeconds: number): Promise<void>;
   get(rideId: string): Promise<DriverLocation | null>;
@@ -23,8 +20,8 @@ export interface LocationStore {
 
   /**
    * An atomic single-holder claim valid for `ttlMs`: true for the first caller in the
-   * window. Declared on the port because the correct implementation is Redis SET NX;
-   * a process-local Map stops working as soon as there is a second API instance.
+   * window. Redis SET NX is the correct implementation — a process-local Map fails as
+   * soon as there is a second API instance.
    */
   claim(key: string, ttlMs: number): Promise<boolean>;
 }

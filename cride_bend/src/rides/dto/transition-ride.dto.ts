@@ -3,10 +3,8 @@ import { RIDE_STATUSES } from '../domain/ride-status';
 
 export const transitionRideSchema = z.object({
   to: z.enum(RIDE_STATUSES),
-  /**
-   * §4.5.2c. Optional so the first client works, but required for correctness:
-   * without it a stale tab silently wins a last-writer-wins race.
-   */
+  /** Optional for convenience, but omitting it opts into last-writer-wins: a stale tab
+   *  silently wins the race instead of getting RIDE_VERSION_CONFLICT. */
   version: z.number().int().min(1).optional(),
   /** Recorded on the ride and in the audit trail; shown to the other party. */
   reason: z.string().trim().max(280).optional(),

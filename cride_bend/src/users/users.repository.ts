@@ -25,6 +25,6 @@ export interface UsersRepository {
   findByEmail(email: string): Promise<(UserRecord & { passwordHash: string }) | null>;
   create(input: CreateUserInput): Promise<UserRecord>;
   existsByEmail(email: string): Promise<boolean>;
-  /** Driver presence. Returns null when the id is unknown. */
+  /** Driver presence; null when the id is unknown. */
   setAvailability(id: string, isAvailable: boolean): Promise<UserRecord | null>;
 }

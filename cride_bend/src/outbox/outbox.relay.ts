@@ -7,25 +7,21 @@ const BATCH_SIZE = 50;
 const POLL_INTERVAL_MS = 250;
 const MAX_ATTEMPTS = 8;
 
-/**
- * The transactional outbox is the only reason a committed ride cannot fail to notify
- * anyone: the row commits with the ride and the relay re-drives it until it lands.
- *
- * At-least-once, so every handler MUST be idempotent.
- */
+/** The transactional outbox is the only reason a committed ride cannot fail to notify anyone:
+ * the row commits with the ride and the relay re-drives it until it lands. At-least-once, so
+ * every handler MUST be idempotent. */
 @Injectable()
 export class OutboxRelay implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(OutboxRelay.name);
   /**
-   * A Set keyed on object identity, not on class name: two consumers implemented by
-   * the same class would silently overwrite each other, and only the last to register
-   * would ever receive an event.
+   * A Set keyed on object identity, not on class name: two consumers implemented by the
+   * same class would silently overwrite each other and only the last to register would
+   * ever receive an event.
    */
   private readonly publishers = new Set<OutboxPublisher>();
   private running = false;
   private timer?: NodeJS.Timeout;
-  // Carries the drained-batch count, which nothing awaits; typed as unknown so the
-  // chain can hold whatever drainOnce resolves to.
+  // Nothing awaits this, hence `unknown`: the chain just serialises the drains.
   private inFlight: Promise<unknown> = Promise.resolve();
 
   constructor(
@@ -40,9 +36,8 @@ export class OutboxRelay implements OnApplicationBootstrap, OnModuleDestroy {
   onApplicationBootstrap(): void {
     this.running = true;
     this.timer = setInterval(() => {
-      // `running` is checked here rather than relying on clearInterval alone, so a
-      // drain already in flight when shutdown starts is still awaited by
-      // onModuleDestroy rather than being abandoned mid-batch.
+      // `running` is checked here rather than relying on clearInterval alone, so a drain
+      // in flight when shutdown starts is still awaited by onModuleDestroy.
       if (!this.running) return;
       this.inFlight = this.inFlight.then(() => this.drainOnce()).catch(() => undefined);
     }, POLL_INTERVAL_MS);
@@ -76,8 +71,8 @@ export class OutboxRelay implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   private async claimBatch() {
-    // findMany + updateMany in one transaction, so the claim and the PROCESSING flip
-    // commit together and a crashed relay's rows roll back instead of being stranded.
+    // The claim and the PROCESSING flip commit together, so a crashed relay's rows roll
+    // back to PENDING instead of being stranded in PROCESSING forever.
     return this.prisma.$transaction(async (tx) => {
       const rows = await tx.outboxMessage.findMany({
         where: { status: 'PENDING', availableAt: { lte: new Date() } },
@@ -96,9 +91,9 @@ export class OutboxRelay implements OnApplicationBootstrap, OnModuleDestroy {
     });
   }
 
-  /** PUBLISHED vs retry is decided purely on whether a handler rejected — never on what
-   * the handler did internally. A DEAD row is marked, never deleted: "which ride never
-   * got its notification" has to stay answerable. */
+  /** PUBLISHED vs retry is decided purely on whether a handler rejected — never on what the
+   * handler did internally. A DEAD row is marked, never deleted: "which ride never got its
+   * notification" has to stay answerable. */
   private async dispatch(row: {
     id: bigint; eventType: string; aggregateId: string; payload: unknown;
     seq: number | null; correlationId: string; attempts: number; createdAt: Date;

@@ -5,10 +5,8 @@ import { CacheService } from '../../platform/cache/cache.service';
 import type { Ride } from '../domain/ride';
 import { RIDE_CACHE_KEYS, type RideCachePort } from '../application/ports/ride-cache.port';
 
-/**
- * Cache is never the source of truth and a cache failure is never a request
- * failure: every write here is also covered by a TTL (30s) and self-healing.
- */
+/** Cache is never the source of truth, and a cache failure is never a request failure: every
+ *  write is also covered by the configured TTL. */
 @Injectable()
 export class RedisRideCacheAdapter implements RideCachePort {
   constructor(
@@ -20,11 +18,9 @@ export class RedisRideCacheAdapter implements RideCachePort {
     return this.config.get<AppConfig>(APP_CONFIG)!.RIDE_CACHE_TTL_SECONDS;
   }
 
-  /**
-   * `revive` on the way out: without it a hit returns `createdAt` and
-   * `fare.amountMinor` as strings while a miss returns Dates and bigints, and
-   * `toResponse` throws only on the hit path.
-   */
+  /** `revive` on the way out: without it a hit returns `createdAt` and `fare.amountMinor`
+   *  as strings while a miss returns Dates and bigints, and only `toResponse` on the hit
+   *  path throws. */
   async get(rideId: string): Promise<Ride | null> {
     const cached = await this.cache.get<unknown>(RIDE_CACHE_KEYS.detail(rideId));
     return cached ? revive(cached as Ride) : null;
@@ -69,10 +65,8 @@ function revive(raw: Ride): Ride {
   };
 }
 
-/**
- * The inverse of `revive`. `set` must dehydrate, never revive: a BigInt reaching
- * `JSON.stringify` throws, and `CacheService.exec` swallows it into a silent miss.
- */
+/** The inverse of `revive`. `set` must dehydrate, never revive: a BigInt reaching
+ *  `JSON.stringify` throws and `CacheService.exec` swallows it into a silent miss. */
 function dehydrate(ride: Ride): unknown {
   const d = (v: Date | null): string | null => (v === null || v === undefined ? null : v.toISOString());
 

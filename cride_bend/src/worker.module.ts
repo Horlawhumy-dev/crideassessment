@@ -14,18 +14,10 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
-/**
- * §3.2 — the worker composition root.
- *
- * No controllers, no HTTP server, no ride write use-cases. A worker that could
- * accept a ride is a worker that can race the API process for the same row, and
- * the concurrency argument in §4.5.2 assumes exactly one class of process performs
- * ride writes.
- *
- * What it does have: the outbox relay (delivery) and the queue consumers
- * (notifications). Both are consumers, which is the correct shape for a process
- * whose latency profile is unrelated to request latency.
- */
+/** No controllers, no HTTP server, no ride write use-cases. A worker that could accept a ride
+ * is a worker that can race the API process for the same row. It does have the outbox relay
+ * and the queue consumers, both consumers, which is the correct shape for a process whose
+ * latency profile is unrelated to request latency. */
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [configuration], cache: true }),

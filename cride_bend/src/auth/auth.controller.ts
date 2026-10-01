@@ -31,9 +31,9 @@ import {
 } from '../common/openapi/api-error-responses';
 import { ACCESS_COOKIE, REFRESH_COOKIE } from '../common/openapi/cookie-names';
 
-// The access token is returned in the body *and* set httpOnly: the BFF and the socket
-// handshake need it in JS, httpOnly keeps XSS out. The refresh token is cookie-only —
-// a body copy would let any XSS escalate a 15-minute token into a permanent session.
+// Access token: body *and* httpOnly cookie — the BFF and the socket handshake need it
+// in JS. Refresh token: cookie only, no body copy, so XSS cannot escalate a 15-minute
+// access token into a permanent session.
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -87,7 +87,7 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  // 5/min vs the 120/min global default: credential-stuffing control, so per-route.
+  // Tighter than the 120/min global default: credential-stuffing control, per route.
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({
     operationId: 'login',
@@ -145,12 +145,11 @@ export class AuthController {
     @Body(new ZodValidationPipe(refreshSchema)) dto: RefreshDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    // Cookie first: the body is only a fallback for non-browser clients (the seed
-    // script, a test).
+    // Cookie first; the body is a fallback for non-browser clients.
     const token = res.req?.cookies?.[REFRESH_COOKIE] ?? dto.refreshToken;
 
-    // Not checked in refreshSchema: Zod cannot read the cookie, and requiring the
-    // body would make the cookie path — the primary one — unreachable.
+    // Not enforced in refreshSchema: Zod cannot read the cookie, so requiring it
+    // would make the cookie path unreachable.
     if (!token) {
       throw new DomainError(
         'MISSING_FIELD',
@@ -214,7 +213,7 @@ export class AuthController {
     res.cookie(REFRESH_COOKIE, result.refreshToken, {
       ...cookieBase(),
       secure,
-      // 30 d, deliberately shorter than the token TTL: a session unused that long must re-login.
+      // 30 d, deliberately shorter than the refresh token TTL: an unused session must re-login.
       maxAge: 30 * 86_400_000,
     });
 

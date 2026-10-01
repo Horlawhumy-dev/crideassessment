@@ -350,10 +350,20 @@ function applyLocationFrame(state: RideState, frame: IncomingFrame): ApplyResult
   };
 }
 
-/** A `sync:applied` frame is the only frame allowed to replace the whole ride. */
+/**
+ * A `sync:applied` frame is the only frame allowed to replace the whole ride.
+ *
+ * Guarded on the ride id, exactly as `reconcile` below is. Without the guard a
+ * resync ack for a ride the user has already left resurrects it: the caller that
+ * issued `ride:sync` for the old ride still receives its ack after the user
+ * moved on, and `applyResync` has no way to tell "the ride I asked about" from
+ * "the ride I am now looking at". `reconcile` already got this right, which is
+ * why the two paths disagreed — one dropped a stale response, the other did not.
+ */
 function applyResync(state: RideState, frame: IncomingFrame): RideState {
   const ride = frame.ride;
   if (!ride) return state;
+  if (state.active && state.active.id !== ride.id) return state;
 
   return {
     ...state,

@@ -58,7 +58,6 @@ describe('round', () => {
   });
 
   it('produces an idempotent result, so cache and row cannot disagree', () => {
-    // Rounding must be idempotent so a cached value compares equal to the row.
     const once = round({ lat: 1.123456789, lng: 2.987654321 });
     expect(round(once)).toEqual(once);
   });

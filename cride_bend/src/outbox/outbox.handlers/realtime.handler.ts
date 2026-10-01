@@ -14,8 +14,8 @@ interface RideEventMessage {
   readonly payload: Record<string, unknown>;
 }
 
-/** A ride that commits and then crashes mid-emit still reaches the rider, because the
- * relay re-drives it. This handler only translates an outbox row into a bus message. */
+/** A ride that commits and then crashes mid-emit still reaches the rider, because the relay
+ * re-drives it. This handler only translates an outbox row into a bus message. */
 @Injectable()
 export class RealtimeHandler implements OutboxPublisher {
   constructor(@Inject(EVENT_BUS) private readonly bus: EventBus) {}
@@ -36,7 +36,9 @@ export class RealtimeHandler implements OutboxPublisher {
       correlationId,
     };
 
-    // Everyone watching the ride sees the status change.
+    // The `event`/`audience` pairs below are the wire names rides.gateway.ts re-emits, not
+    // outbox row names. The first goes to the ride room; one outbox event can fan out to
+    // several distinct messages (see EgressGuard on why they must not dedupe together).
     await this.bus.publish(RIDE_EVENT_TOPIC, {
       rideId,
       audience: 'ride',

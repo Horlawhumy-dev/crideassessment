@@ -4,11 +4,9 @@ export const CORRELATION_HEADER = 'x-request-id';
 
 const MAX_LENGTH = 128;
 
-/**
- * One id joining logs, spans, events, the outbox and the bus. A client-supplied
- * value is honoured but validated: an unvalidated header echoed into every log
- * line is a log-injection vector.
- */
+/** One id joining logs, spans, events, the outbox and the bus. A client-supplied value is
+ *  honoured but validated: an unvalidated header echoed into every log line is a log-injection
+ *  vector. */
 export function resolveCorrelationId(incoming: unknown): string {
   if (typeof incoming === 'string') {
     const trimmed = incoming.trim();

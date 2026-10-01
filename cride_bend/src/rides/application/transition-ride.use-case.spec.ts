@@ -16,9 +16,7 @@ import {
   immediateTransaction,
 } from '../../test/fakes';
 
-/**
- * §4.5.2(c) — optimistic concurrency on the generic transition path.
- */
+/** Optimistic concurrency on the generic transition path. */
 const RIDER: Principal = { userId: 'rider-1', role: 'RIDER', sessionId: 'sr' };
 const DRIVER: Principal = { userId: 'driver-1', role: 'DRIVER', sessionId: 'sd' };
 const OTHER_DRIVER: Principal = { userId: 'driver-9', role: 'DRIVER', sessionId: 'so' };
@@ -84,8 +82,8 @@ describe('TransitionRideUseCase', () => {
   });
 
   it('refuses a stale version rather than clobbering a newer state', async () => {
-    // The whole point of `version`: a driver whose tab was open while someone else
-    // moved the ride on gets a 409, not a silent overwrite.
+    // The whole point of `version`: a tab left open while someone else moved the ride
+    // on gets a 409, not a silent overwrite.
     const { useCase, rides } = build(accepted());
 
     await expect(
@@ -103,9 +101,8 @@ describe('TransitionRideUseCase', () => {
   });
 
   it('hides the ride from a driver who is not the assigned one', async () => {
-    // 404, not 403. A non-assigned driver is not a participant at all, so
-    // answering 403 would confirm the ride exists and turn the accept endpoint
-    // into a way to enumerate every open ride and its assigned driver.
+    // 404, not 403: a non-assigned driver is not a participant, so 403 would confirm
+    // the ride exists and turn accept into a way to enumerate open rides and drivers.
     const { useCase, outbox } = build(accepted());
     await expect(
       useCase.execute(OTHER_DRIVER, 'ride-1', { to: 'IN_PROGRESS' }, 'c1'),
@@ -115,8 +112,7 @@ describe('TransitionRideUseCase', () => {
 
   it('rejects an illegal edge', async () => {
     // REQUESTED -> COMPLETED: the ride never got a driver, so there is no trip to
-    // complete. This used to be asserted with DRIVER -> CANCELLED, which stopped
-    // being illegal the moment a driver was allowed to drop a trip.
+    // complete.
     const { useCase } = build(accepted());
     await expect(
       useCase.execute(DRIVER, 'ride-1', { to: 'COMPLETED' }, 'c1'),
@@ -124,8 +120,8 @@ describe('TransitionRideUseCase', () => {
   });
 
   it('lets the assigned driver cancel, and records that a driver did', async () => {
-    // The whole point of the change: a driver who cannot end a trip they are on
-    // leaves the rider waiting for something that is never going to happen.
+    // A driver who cannot end a trip they are on leaves the rider waiting for
+    // something that is never going to happen.
     const { useCase, rides, outbox, events } = build(accepted());
     const result = await useCase.execute(DRIVER, 'ride-1', { to: 'CANCELLED', reason: 'vehicle broke down' }, 'c1');
 
@@ -133,19 +129,19 @@ describe('TransitionRideUseCase', () => {
     expect(rides.current()?.cancelledBy).toBe('DRIVER');
     expect(rides.current()?.cancelReason).toBe('vehicle broke down');
     // Still stamped on the row: the driver is a fact about the trip, not something
-    // the cancellation should erase. The relaxed CHECK constraint in migration
-    // 0004 exists precisely so this can be true.
+    // the cancellation erases. Migration 0004 relaxes the CHECK constraint so this
+    // can be true.
     expect(rides.current()?.driverId).toBe('driver-1');
     expect(outbox.events.map((e) => e.type)).toContain('ride.cancelled');
     expect(events.appended.map((e) => e.eventType)).toContain('ride.cancelled');
-    // The audit trail names who acted, so "the trip vanished" is never the only
-    // thing a rider or support can learn.
+    // The audit trail names who acted, so "the trip vanished" is never all a rider
+    // or support can learn.
     expect(events.appended.at(-1)?.actorRole).toBe('DRIVER');
   });
 
   it('refuses a driver cancelling a ride they are not on', async () => {
-    // `ride:offer` reaches every available driver, so this is the difference between
-    // "I saw this request" and "this is my trip".
+    // `ride:offer` reaches every available driver, so "I saw this request" must not be
+    // enough to end a trip.
     const { useCase, outbox } = build(accepted());
     await expect(
       useCase.execute(OTHER_DRIVER, 'ride-1', { to: 'CANCELLED' }, 'c1'),

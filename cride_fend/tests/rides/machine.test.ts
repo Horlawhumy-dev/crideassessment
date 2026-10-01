@@ -365,18 +365,24 @@ describe('driverPath', () => {
     );
     const next = reconcile(first, { ...RIDE, id: 'ride-2', status: 'ACCEPTED', driverId: 'driver-2' });
 
-    // `reconcile` refuses a different ride's response outright, so the way a new
-    // ride actually arrives is through the socket snapshot.
     expect(next).toBe(first);
 
+    // A resync for a different ride is refused outright, same as `reconcile`. The
+    // resync ack for a ride the user has already left arrives *after* the move —
+    // `requestSync` and the `joinRide` fallback both outlive it — so honouring it
+    // would resurrect the old ride on screen. Ignoring the whole frame is what
+    // makes the path safe: there is no state in which ride-2 is active while
+    // ride-1's track is still attached to it.
     const resynced = applyFrame(first, {
       type: 'sync:applied',
       ride: { ...RIDE, id: 'ride-2', status: 'ACCEPTED', driverId: 'driver-2' },
       events: [event(1, 'ride.requested')],
       lastSeq: 1,
-    }).state;
+    });
 
-    expect(resynced.driverPath).toEqual([]);
+    expect(resynced.state).toBe(first);
+    expect(resynced.state.driverPath).toEqual(first.driverPath);
+    expect(resynced.state.active?.id).toBe(RIDE.id);
   });
 
   it('keeps the path through a resync of the same ride', () => {

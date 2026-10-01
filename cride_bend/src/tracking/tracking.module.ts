@@ -8,9 +8,9 @@ import { LOCATION_STORE } from './location.store';
 import { RouteBufferModule } from './route-buffer.module';
 
 /**
- * Ingress (LocationGateway) and egress (LocationEgress) together. RidesModule is
- * imported for RIDE_REPOSITORY, which an export only makes visible to importers, and
- * for RidesGateway, which owns the ride rooms. The edge points tracking -> rides only.
+ * Ingress (LocationGateway) and egress (LocationEgress). RidesModule supplies
+ * RIDE_REPOSITORY (an export only reaches importers) and RidesGateway, which owns the
+ * ride rooms. The edge points tracking -> rides only.
  */
 @Module({
   imports: [AuthModule, RidesModule, RouteBufferModule],

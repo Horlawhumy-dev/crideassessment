@@ -1,9 +1,6 @@
 export type AppRole = 'api' | 'worker' | 'all';
 
-/**
- * One codebase, three boot shapes, split at the composition root rather than the
- * directory tree: API latency and queue workload scale on different axes.
- */
+/** Three boot shapes, split at the composition root: API latency and queue workload scale on different axes. */
 export const APP_ROLES: readonly AppRole[] = ['api', 'worker', 'all'];
 
 export function resolveRole(env: NodeJS.ProcessEnv = process.env): AppRole {

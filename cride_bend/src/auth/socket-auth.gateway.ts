@@ -5,7 +5,7 @@ import type { Principal } from './principal';
 
 /**
  * A socket client can send a cookie but cannot read localStorage, so this handshake
- * works only because the access token is also set as the `cride.sid` httpOnly cookie.
+ * works only because the access token is also the httpOnly `cride.sid` cookie.
  */
 @Injectable()
 export class SocketAuth {

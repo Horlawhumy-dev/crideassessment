@@ -42,8 +42,8 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthResult> {
-    // INVALID_CREDENTIALS, not a distinct code: "email already taken" is the
-    // enumeration oracle the login path exists to avoid.
+    // INVALID_CREDENTIALS, not a distinct code: "email already taken" is the same
+    // enumeration oracle the login path avoids.
     if (await this.users.existsByEmail(dto.email)) {
       throw new AuthError('INVALID_CREDENTIALS');
     }
@@ -81,8 +81,7 @@ export class AuthService {
     const consumed = await this.sessions.consume(refreshToken);
 
     if (consumed === 'REPLAYED') {
-      // The only branch worth alerting on: a token that was valid came back
-      // twice, so two parties hold credentials from one family.
+      // A token that was valid came back twice: two parties hold one family's credentials.
       this.logger.warn('auth.refresh_replay_detected');
       throw new AuthError('TOKEN_REVOKED');
     }
@@ -94,7 +93,7 @@ export class AuthService {
     // Token row whose user was deleted: same class as unrecognised, nothing to steal.
     if (!user) throw new AuthError('INVALID_REFRESH_TOKEN');
 
-    // Same familyId, so a later replay still revokes everything issued from this login.
+    // Reuse the familyId so a later replay still revokes everything from this login.
     return this.startSession(user, consumed.familyId);
   }
 
@@ -104,12 +103,10 @@ export class AuthService {
 
   /**
    * The token carries only id, role and sid: a JWT is base64, not encrypted, so any
-   * field in it is readable by the client. The profile is loaded per request here
-   * rather than cached in the token.
+   * field in it is readable by the client. The profile is loaded per request.
    */
   async currentUser(principal: Principal): Promise<AuthResult['user'] & { phone: string | null; isAvailable: boolean }> {
     const user = await this.users.findById(principal.userId);
-    // Verified signature for a deleted row: the session is real, the account is gone.
     if (!user) throw new UserNotFoundError(principal.userId);
 
     return {
@@ -154,8 +151,5 @@ export class AuthService {
   }
 }
 
-/**
- * A real bcrypt hash: any non-bcrypt string would fail fast inside bcrypt.compare
- * and reopen the timing gap the dummy compare exists to close.
- */
+/** A real bcrypt hash: any non-bcrypt string fails fast inside bcrypt.compare and reopens the timing gap. */
 const DUMMY_HASH = '$2b$12$KbQi1xN6HnTuS8uQOWAqzO1w4tC2K9R3F2AaDkMHQ1C7NvQfEhz8Iq';

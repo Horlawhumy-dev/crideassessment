@@ -25,28 +25,19 @@ import { CorrelationInterceptor } from './common/interceptors/correlation.interc
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { PrismaErrorFilter } from './platform/prisma/prisma-error.filter';
 
-/**
- * §4.2 — the composition root. This is the only file that knows which adapter
- * satisfies which port across the whole application, and the reason a feature
- * module can stay ignorant of infrastructure.
- *
- * Guard order is load-bearing and is set here, once, rather than per controller:
- *
- *  1. Correlation  — assigns the id every later layer logs.
- *  2. Throttle     — before authentication, so a flood costs nothing but a counter.
- *  3. JWT          — populates the Principal.
- *  4. Roles        — static role check (@Roles).
- *  5. RideAccess   — advisory only; the real check is ride-policy.ts, because a
- *                    guard that loads a ride needs a repository and turns a domain
- *                    rule into an integration test.
- */
+/** The composition root: the only file that knows which adapter satisfies which port.
+ * Guard order is set here, once, and is deliberate — `ThrottlerGuard` runs BEFORE
+ * `JwtAuthGuard` so a credential flood costs a counter, not a bcrypt call. `RideAccessGuard`
+ * is advisory only; the real check is ride-policy.ts, because a guard that loads a ride needs
+ * a repository and turns a domain rule into an integration test. */
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [configuration], cache: true }),
     ThrottlerModule.forRoot([
-      // Deliberately generous: a global limit low enough to be protective on the
-      // login route is also low enough to break a user opening several tabs.
+      // Deliberately generous: a global limit low enough to be protective on the login
+      // route is also low enough to break a user opening several tabs.
       { name: 'default', ttl: 60_000, limit: 120 },
     ]),
     ScheduleModule.forRoot(),
@@ -69,15 +60,17 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     { provide: APP_INTERCEPTOR, useClass: CorrelationInterceptor },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
     { provide: APP_INTERCEPTOR, useClass: TimeoutInterceptor },
-    // ThrottlerGuard must be registered as an APP_GUARD. The @Throttle decorators
-    // on the auth and write routes are inert metadata until something reads them,
-    // and without this guard the tight 5-per-minute limit on /auth/login was a
-    // comment rather than a control.
+    // Must be an APP_GUARD: the `@Throttle` decorators are inert metadata until something
+    // reads them, and without it the 5-per-minute limit on /auth/login is a comment.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: RideAccessGuard },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
+    // Registered *after* the catch-all, which is what makes it effective: Nest reverses the
+    // global filter list before matching and takes the first hit, and `AllExceptionsFilter` is
+    // `@Catch()` with no metatypes. Reversing these two lines makes this filter dead code.
+    { provide: APP_FILTER, useClass: PrismaErrorFilter },
   ],
 })
 export class AppModule {}

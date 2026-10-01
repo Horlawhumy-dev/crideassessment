@@ -9,10 +9,7 @@ import type { Principal } from '../rides/domain/ride-policy';
 import { DriverAvailabilityService } from './driver-availability.service';
 import { setAvailabilitySchema, type SetAvailabilityDto } from './dto/set-availability.dto';
 
-/**
- * A separate module rather than two more routes on RidesController: availability is a
- * fact about a person, not a ride.
- */
+/** Separate from RidesController because availability is a fact about a person, not a ride. */
 @ApiTags('driver')
 @Controller('driver')
 export class DriverController {

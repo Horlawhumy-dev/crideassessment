@@ -28,7 +28,7 @@ interface Frame {
 
 /**
  * Ordered ingress: ownership and ride status (shared policy), Redis rate limit,
- * coordinate bounds, teleport check. The last two are Redis-backed — a per-process
+ * coordinate bounds, teleport check. The last three are Redis-backed — a per-process
  * limiter resets on deploy and a second API instance bypasses it entirely.
  */
 @WebSocketGateway({
@@ -50,7 +50,7 @@ export class LocationGateway implements OnGatewayConnection, OnGatewayDisconnect
     try {
       socket.data.principal = this.auth.authenticate(socket);
     } catch {
-      // Nothing logged: an unauthenticated socket is uninteresting, and the token must not be logged.
+      // Unauthenticated sockets are uninteresting, and the token must not be logged.
       socket.disconnect(true);
     }
   }
@@ -89,8 +89,8 @@ export class LocationGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     const position = round({ lat: frame.lat, lng: frame.lng });
 
-    // 6 teleport check, against the last *accepted* position so it survives a
-    // reconnect and works across instances.
+    // 6 teleport check against the last *accepted* position, so it survives a reconnect
+    // and works across instances.
     const previous = await this.store.get(frame.rideId);
     if (previous && distanceMetres(previous.position, position) > cfg.LOCATION_MAX_JUMP_METRES) {
       this.logger.warn('location.jump_rejected', {
@@ -113,9 +113,8 @@ export class LocationGateway implements OnGatewayConnection, OnGatewayDisconnect
     await this.store.put(frame.rideId, location, cfg.LOCATION_TTL_SECONDS);
     await this.store.publish(frame.rideId, location);
 
-    // Buffer last, and deliberately allowed to fail: the frame is already published, so
-    // a Redis hiccup costs one point of a cosmetic trail rather than the update a rider
-    // is watching move. That ordering is what makes swallowing it safe.
+    // Buffer last and deliberately allowed to fail: the frame is already published, so a
+    // Redis hiccup costs one point of a cosmetic trail, not the move a rider is watching.
     await this.track
       .append(frame.rideId, {
         lat: position.lat,

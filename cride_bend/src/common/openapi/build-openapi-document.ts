@@ -26,10 +26,7 @@ export const ACCESS_SECURITY = 'accessCookie';
 export const REFRESH_SECURITY = 'refreshCookie';
 export const BEARER_SECURITY = 'bearerAuth';
 
-/**
- * Everything here is derived from a source of truth (the error registry, the ride
- * status array, the Zod schemas) or declared next to the mapper it describes.
- */
+/** Every entry is derived from a source of truth, or declared next to the mapper it describes. */
 export function buildOpenApiDocument(app: INestApplication) {
   const config = new DocumentBuilder()
     .setTitle('C-Ride API')
@@ -67,7 +64,7 @@ export function buildOpenApiDocument(app: INestApplication) {
     .addTag('health', 'Liveness and dependency state. Unauthenticated and unthrottled.')
     .addServer('http://localhost:4000', 'Local (docker compose + npm run start:dev)')
     // The third argument is the *security scheme name*. `addCookieAuth` defaults it
-    // to 'cookie', so two anonymous calls collapse into one entry and the survivor is
+    // to 'cookie', so two anonymous calls collapse into one and the survivor is
     // whichever was registered last.
     .addCookieAuth(
       ACCESS_COOKIE,
@@ -133,10 +130,7 @@ export function buildOpenApiDocument(app: INestApplication) {
   return document;
 }
 
-/**
- * Generated from ERROR_REGISTRY rather than typed out, so a code added to the backend
- * cannot be missing from the contract the frontend generates from.
- */
+/** Built from ERROR_REGISTRY, not typed out, so a new backend code cannot be missing from the contract. */
 function addErrorReferencePage(document: OpenAPIObject): void {
   const byCategory = new Map<string, typeof ERROR_CODE_TABLE>();
   for (const entry of ERROR_CODE_TABLE) {

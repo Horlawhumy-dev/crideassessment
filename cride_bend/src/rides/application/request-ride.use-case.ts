@@ -20,14 +20,9 @@ export interface RequestRideResult {
   readonly estimatedDurationMs: number;
 }
 
-/**
- * §4.5.3 — the request path, end to end.
- *
- * The transaction is steps 4-5 and nothing else. Cache invalidation happens after
- * COMMIT and is explicitly allowed to fail, because the outbox relay retries
- * delivery and the cache self-heals via TTL. Nothing after COMMIT is on the
- * critical path of correctness — that is P1 made concrete.
- */
+/** The transaction covers the row, its event and its outbox write and nothing else. Cache
+ *  invalidation happens after COMMIT and may fail: the relay retries delivery and the cache
+ *  self-heals via TTL. */
 @Injectable()
 export class RequestRideUseCase {
   constructor(
@@ -42,8 +37,8 @@ export class RequestRideUseCase {
 
   async execute(principal: Principal, dto: RequestRideDto, correlationId: string): Promise<RequestRideResult> {
     assertRole(principal, 'RIDER');
-    // assertValidPoint is a kernel guard; translate its failure into a DomainError
-    // so the filter can answer 400 with a code rather than leaking a 500.
+    // assertValidPoint throws a plain Error; translate it so the filter can answer
+    // 400 with a code rather than leaking a 500.
     for (const point of [dto.pickup, dto.dropoff]) {
       try {
         assertValidPoint(point);
@@ -100,7 +95,6 @@ export class RequestRideUseCase {
       return created;
     });
 
-    // Post-commit, best-effort. Every DEL is also covered by the TTL.
     await this.cache.invalidateRider(principal.userId).catch(() => undefined);
 
     this.metrics.counter('ride_requests_total').inc();
